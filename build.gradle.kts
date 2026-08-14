@@ -13,7 +13,9 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:26.2.build.+")
+    compileOnly("io.papermc.paper:paper-api:26.2.build.112-stable")
+
+    implementation("org.yaml:snakeyaml:2.2")
 
     implementation("com.zaxxer:HikariCP:7.1.0")
     implementation("org.xerial:sqlite-jdbc:3.53.2.1")
@@ -26,6 +28,8 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.14.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core:3.27.7")
+    testImplementation("net.kyori:adventure-text-minimessage:5.2.0")
+    testImplementation("net.kyori:adventure-text-serializer-plain:5.2.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     testImplementation(platform("org.testcontainers:testcontainers-bom:2.0.5"))
@@ -75,6 +79,8 @@ tasks {
         }
 
         exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
+
+        relocate("org.yaml.snakeyaml", "net.epicpunishments.lib.snakeyaml")
     }
 
     assemble {

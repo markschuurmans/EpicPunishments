@@ -1,0 +1,7 @@
+command:
+  usage: '<gold>Use <yellow>/epicpunishments \<subcommand></yellow>.</gold>'
+  version: "<gold>EpicPunishments <yellow>{version}</yellow></gold>"
+  reload-started: "<yellow>Reloading EpicPunishments configuration...</yellow>"
+  reload-success: "<green>EpicPunishments configuration reloaded.</green>"
+  reload-failed: "<red>Reload failed. The previous configuration is still active.</red>"
+  not-ready: "<red>EpicPunishments is still starting. Try again shortly.</red>"

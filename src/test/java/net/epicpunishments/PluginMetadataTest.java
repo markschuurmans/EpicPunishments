@@ -18,8 +18,9 @@ class PluginMetadataTest {
 
             assertThat(descriptor)
                     .contains("version: '1.0-SNAPSHOT'")
-                    .contains("main: net.epicpunishments.EpicPunishments")
+                    .contains("main: net.epicpunishments.bootstrap.EpicPunishments")
                     .contains("api-version: '26.2'")
+                    .contains("epicpunishments.command.reload:")
                     .doesNotContain("${version}")
                     .doesNotContain("net.epicPunishments");
         }
@@ -29,9 +30,11 @@ class PluginMetadataTest {
     void renamedPluginAndCommandClassFilesArePresent() {
         ClassLoader classLoader = getClass().getClassLoader();
 
-        assertThat(classLoader.getResource("net/epicpunishments/EpicPunishments.class")).isNotNull();
-        assertThat(classLoader.getResource("net/epicpunishments/command/EpicPunishmentsCommand.class")).isNotNull();
-        assertThat(classLoader.getResource("net/epicpunishments/command/subcommand/VersionCommand.class")).isNotNull();
-        assertThat(classLoader.getResource("net/epicpunishments/command/subcommand/ReloadCommand.class")).isNotNull();
+        assertThat(classLoader.getResource("net/epicpunishments/bootstrap/EpicPunishments.class")).isNotNull();
+        assertThat(classLoader.getResource("net/epicpunishments/bootstrap/PluginContainer.class")).isNotNull();
+        assertThat(classLoader.getResource("net/epicpunishments/interaction/command/EpicPunishmentsCommand.class"))
+                .isNotNull();
+        assertThat(classLoader.getResource("config.yml")).isNotNull();
+        assertThat(classLoader.getResource("messages.yml")).isNotNull();
     }
 }

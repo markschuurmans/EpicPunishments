@@ -1,0 +1,64 @@
+package net.epicpunishments.interaction.command;
+
+import com.mojang.brigadier.Command;
+import com.mojang.brigadier.context.CommandContext;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import net.epicpunishments.common.config.ConfigurationService;
+import net.epicpunishments.interaction.command.subcommand.ReloadCommand;
+import net.epicpunishments.interaction.command.subcommand.VersionCommand;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.logging.Logger;
+
+public final class EpicPunishmentsCommand implements EpicCommand {
+    private final ConfigurationService configurations;
+    private final Collection<EpicCommand> subcommands;
+
+    public EpicPunishmentsCommand(
+            ConfigurationService configurations,
+            String version,
+            PaperMessageDispatcher messageDispatcher,
+            Logger logger
+    ) {
+        this.configurations = configurations;
+        this.subcommands = List.of(
+                new VersionCommand(configurations, version),
+                new ReloadCommand(configurations, messageDispatcher, logger)
+        );
+    }
+
+    @Override
+    public String name() {
+        return "epicpunishments";
+    }
+
+    @Override
+    public String permission() {
+        return "epicpunishments.command";
+    }
+
+    @Override
+    public String description() {
+        return "Manage EpicPunishments";
+    }
+
+    @Override
+    public Collection<EpicCommand> subcommands() {
+        return subcommands;
+    }
+
+    @Override
+    public int execute(CommandContext<CommandSourceStack> context) {
+        Component message = configurations.current()
+                .map(snapshot -> snapshot.messages().message("command.usage"))
+                .orElseGet(() -> Component.text(
+                        "Use /epicpunishments <subcommand>.",
+                        NamedTextColor.GOLD
+                ));
+        context.getSource().getSender().sendMessage(message);
+        return Command.SINGLE_SUCCESS;
+    }
+}

@@ -1,0 +1,23 @@
+database:
+  type: sqlite
+  query-timeout: 3s
+  login-failure-policy: deny
+
+  sqlite:
+    file: epicpunishments.db
+
+  mysql:
+    host: localhost
+    port: 3306
+    database: epicpunishments
+    username: root
+    password: ${EPIC_DB_PASSWORD}
+    pool-size: 8
+
+  postgres:
+    host: localhost
+    port: 5432
+    database: epicpunishments
+    username: postgres
+    password: ${EPIC_DB_PASSWORD}
+    pool-size: 8

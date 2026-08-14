@@ -1,4 +1,4 @@
-package net.epicpunishments.command;
+package net.epicpunishments.interaction.command;
 
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.plugin.java.JavaPlugin;

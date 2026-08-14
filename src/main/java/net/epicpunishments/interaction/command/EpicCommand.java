@@ -1,4 +1,4 @@
-package net.epicpunishments.command;
+package net.epicpunishments.interaction.command;
 
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;

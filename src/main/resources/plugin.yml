@@ -1,6 +1,17 @@
 name: EpicPunishments
 version: '${version}'
 
-main: net.epicpunishments.EpicPunishments
+main: net.epicpunishments.bootstrap.EpicPunishments
 api-version: '26.2'
 load: POSTWORLD
+
+permissions:
+  epicpunishments.command:
+    description: Allows access to the EpicPunishments command.
+    default: op
+  epicpunishments.command.version:
+    description: Allows viewing the EpicPunishments version.
+    default: op
+  epicpunishments.command.reload:
+    description: Allows reloading supported EpicPunishments settings.
+    default: op
