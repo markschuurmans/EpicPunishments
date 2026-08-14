@@ -1,6 +1,6 @@
 name: EpicPunishments
-version: '${project.version}'
-main: com.markiesch.EpicPunishments
-api-version: 1.14
-author: Markiesch
-description: Punish evil players through an easy to use GUI
+version: '${version}'
+
+main: net.epicPunishments.EpicPunishments
+api-version: '26.2'
+load: POSTWORLD
