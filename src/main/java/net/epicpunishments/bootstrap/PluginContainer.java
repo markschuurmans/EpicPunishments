@@ -2,18 +2,28 @@ package net.epicpunishments.bootstrap;
 
 import net.epicpunishments.common.config.ConfigurationException;
 import net.epicpunishments.common.config.ConfigurationService;
+import net.epicpunishments.common.config.ConfigurationSnapshot;
 import net.epicpunishments.common.config.ResourceProvider;
 import net.epicpunishments.common.config.YamlConfigurationLoader;
 import net.epicpunishments.common.execution.BoundedTaskExecutor;
+import net.epicpunishments.common.persistence.PersistenceException;
+import net.epicpunishments.common.persistence.PersistenceFailureKind;
+import net.epicpunishments.common.persistence.PersistenceHealth;
+import net.epicpunishments.common.persistence.PersistenceProvider;
+import net.epicpunishments.infrastructure.persistence.PersistenceProviderFactory;
 import net.epicpunishments.interaction.PaperMainThreadExecutor;
 import net.epicpunishments.interaction.command.CommandManager;
 import net.epicpunishments.interaction.command.EpicPunishmentsCommand;
 import net.epicpunishments.interaction.command.PaperMessageDispatcher;
 
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class PluginContainer implements AutoCloseable {
@@ -26,6 +36,7 @@ public final class PluginContainer implements AutoCloseable {
     private final ConfigurationService configurations;
     private final PaperMainThreadExecutor mainThreadExecutor;
     private final AtomicBoolean stopping = new AtomicBoolean();
+    private volatile PersistenceProvider persistenceProvider;
 
     private PluginContainer(
             EpicPunishments plugin,
@@ -71,7 +82,23 @@ public final class PluginContainer implements AutoCloseable {
                 plugin.getLogger()
         ));
 
-        configurations.start().whenComplete((snapshot, failure) -> {
+        configurations.start().thenCompose(snapshot -> {
+            if (stopping.get()) {
+                return CompletableFuture.<ConfigurationSnapshot>failedFuture(
+                        new IllegalStateException("Plugin is stopping.")
+                );
+            }
+            PersistenceProvider provider = PersistenceProviderFactory.create(snapshot.database(), taskExecutor);
+            persistenceProvider = provider;
+            return provider.initialize()
+                    .thenCompose(ignored -> provider.health())
+                    .thenCompose(health -> health == PersistenceHealth.HEALTHY
+                            ? CompletableFuture.completedFuture(snapshot)
+                            : CompletableFuture.failedFuture(new PersistenceException(
+                                    PersistenceFailureKind.UNAVAILABLE,
+                                    "Persistence health check reported " + health.name().toLowerCase(Locale.ROOT)
+                            )));
+        }).whenComplete((snapshot, failure) -> {
             if (stopping.get()) {
                 return;
             }
@@ -85,8 +112,10 @@ public final class PluginContainer implements AutoCloseable {
                     plugin.getServer().getPluginManager().disablePlugin(plugin);
                     return;
                 }
-                plugin.getLogger().info("Configuration and messages loaded; database provider: "
-                        + snapshot.database().type().name().toLowerCase(java.util.Locale.ROOT) + '.');
+                PersistenceProvider provider = persistenceProvider;
+                String schemaVersion = provider.schemaVersion().toCompletableFuture().join();
+                plugin.getLogger().info("Configuration, messages, and database schema loaded; provider: "
+                        + provider.providerName() + ", schema version: " + schemaVersion + '.');
             });
         });
     }
@@ -100,6 +129,7 @@ public final class PluginContainer implements AutoCloseable {
         configurations.stop();
         mainThreadExecutor.close();
         plugin.getServer().getGlobalRegionScheduler().cancelTasks(plugin);
+        closePersistence();
         var shutdown = taskExecutor.shutdownGracefully();
         if (!shutdown.terminated()) {
             plugin.getLogger().warning("The EpicPunishments executor did not terminate within "
@@ -111,13 +141,34 @@ public final class PluginContainer implements AutoCloseable {
         }
     }
 
+    private void closePersistence() {
+        PersistenceProvider provider = persistenceProvider;
+        if (provider == null) {
+            return;
+        }
+        try {
+            provider.closeAsync().toCompletableFuture().get(SHUTDOWN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            plugin.getLogger().warning("Interrupted while closing the persistence provider.");
+        } catch (TimeoutException exception) {
+            plugin.getLogger().warning("The persistence provider did not close within "
+                    + SHUTDOWN_TIMEOUT.toSeconds() + " seconds.");
+        } catch (ExecutionException exception) {
+            plugin.getLogger().warning("The persistence provider could not close cleanly. "
+                    + safeFailureMessage(exception));
+        }
+    }
+
     private static String safeFailureMessage(Throwable failure) {
         Throwable cause = failure;
         while ((cause instanceof CompletionException || cause instanceof ExecutionException)
                 && cause.getCause() != null) {
             cause = cause.getCause();
         }
-        if (cause instanceof ConfigurationException || cause instanceof IllegalStateException) {
+        if (cause instanceof ConfigurationException
+                || cause instanceof PersistenceException
+                || cause instanceof IllegalStateException) {
             return cause.getMessage();
         }
         return "Unexpected " + cause.getClass().getSimpleName() + '.';

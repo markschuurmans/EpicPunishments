@@ -144,10 +144,14 @@ public abstract class ReportRepositoryContract {
                 .toCompletableFuture().join();
         var openReports = fixture.reports().findByStatus(Optional.of(ReportStatus.OPEN), new PageRequest(0, 2))
                 .toCompletableFuture().join();
+        var allReportsSecondPage = fixture.reports().findByStatus(Optional.empty(), new PageRequest(1, 2))
+                .toCompletableFuture().join();
 
         assertThat(ownReports.items()).containsExactly(newest, oldest);
         assertThat(openReports.items()).containsExactly(otherReporter, newest);
         assertThat(openReports.totalItems()).isEqualTo(3);
+        assertThat(allReportsSecondPage.items()).containsExactly(oldest);
+        assertThat(allReportsSecondPage.totalItems()).isEqualTo(3);
     }
 
     @Test
