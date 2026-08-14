@@ -15,3 +15,6 @@ permissions:
   epicpunishments.command.reload:
     description: Allows reloading supported EpicPunishments settings.
     default: op
+  epicpunishments.notify.degraded:
+    description: Receives warnings when login protection is degraded.
+    default: op

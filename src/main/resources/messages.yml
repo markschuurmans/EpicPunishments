@@ -5,3 +5,11 @@ command:
   reload-success: "<green>EpicPunishments configuration reloaded.</green>"
   reload-failed: "<red>Reload failed. The previous configuration is still active.</red>"
   not-ready: "<red>EpicPunishments is still starting. Try again shortly.</red>"
+
+login:
+  banned: "<red>You are banned: {reason}</red>"
+  temporary-error: "<red>Moderation data is temporarily unavailable. Please try again shortly.</red>"
+  degraded-warning: "<red><bold>Moderation protection is degraded</bold></red><red> while assessing player {player-id}. Check the server logs.</red>"
+
+warning:
+  received: "<gold>Warning: <yellow>{reason}</yellow></gold>"

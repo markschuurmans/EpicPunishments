@@ -7,6 +7,7 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
@@ -86,6 +87,29 @@ public final class YamlConfigurationLoader implements ConfigurationLoader {
     }
 
     private Map<String, Object> loadYaml(String name) throws ConfigurationException {
+        try (Reader reader = Files.newBufferedReader(dataDirectory.resolve(name), StandardCharsets.UTF_8)) {
+            return parseYaml(reader, name);
+        } catch (ConfigurationException exception) {
+            throw exception;
+        } catch (IOException | RuntimeException exception) {
+            throw new ConfigurationException("Could not parse " + name + '.', exception);
+        }
+    }
+
+    private Map<String, Object> loadBundledYaml(String name) throws ConfigurationException {
+        try (InputStream source = resources.open(name)) {
+            if (source == null) {
+                throw new ConfigurationException("Bundled default " + name + " is missing.");
+            }
+            return parseYaml(new InputStreamReader(source, StandardCharsets.UTF_8), "bundled " + name);
+        } catch (ConfigurationException exception) {
+            throw exception;
+        } catch (IOException | RuntimeException exception) {
+            throw new ConfigurationException("Could not parse bundled " + name + '.', exception);
+        }
+    }
+
+    private Map<String, Object> parseYaml(Reader reader, String name) throws ConfigurationException {
         LoaderOptions options = new LoaderOptions();
         options.setAllowDuplicateKeys(false);
         options.setAllowRecursiveKeys(false);
@@ -93,7 +117,7 @@ public final class YamlConfigurationLoader implements ConfigurationLoader {
         options.setNestingDepthLimit(30);
         options.setCodePointLimit(1_000_000);
 
-        try (Reader reader = Files.newBufferedReader(dataDirectory.resolve(name), StandardCharsets.UTF_8)) {
+        try {
             Object loaded = new Yaml(new SafeConstructor(options)).load(reader);
             if (!(loaded instanceof Map<?, ?> root)) {
                 throw new ConfigurationException(name + " must contain a YAML mapping at its root.");
@@ -101,7 +125,7 @@ public final class YamlConfigurationLoader implements ConfigurationLoader {
             return stringKeyedMap(root, name);
         } catch (ConfigurationException exception) {
             throw exception;
-        } catch (IOException | RuntimeException exception) {
+        } catch (RuntimeException exception) {
             throw new ConfigurationException("Could not parse " + name + '.', exception);
         }
     }
@@ -151,6 +175,7 @@ public final class YamlConfigurationLoader implements ConfigurationLoader {
 
     private MessageCatalog readMessageCatalog(Map<String, Object> root) throws ConfigurationException {
         var flattened = new LinkedHashMap<String, String>();
+        flattenMessages("", loadBundledYaml(MESSAGES_FILE), flattened);
         flattenMessages("", root, flattened);
         try {
             return MessageCatalog.parse(flattened);

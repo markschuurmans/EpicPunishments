@@ -164,6 +164,12 @@ class YamlConfigurationLoaderTest {
                   reload-success: "<green>Reloaded</green>"
                   reload-failed: "<red>Failed</red>"
                   not-ready: "<red>Starting</red>"
+                login:
+                  banned: "<red>Banned: {reason}</red>"
+                  temporary-error: "<red>Unavailable</red>"
+                  degraded-warning: "<red>Degraded for {player-id}</red>"
+                warning:
+                  received: "<gold>Warning: {reason}</gold>"
                 """;
     }
 }

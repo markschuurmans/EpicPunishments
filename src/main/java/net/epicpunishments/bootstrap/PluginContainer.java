@@ -11,11 +11,18 @@ import net.epicpunishments.common.persistence.PersistenceFailureKind;
 import net.epicpunishments.common.persistence.PersistenceHealth;
 import net.epicpunishments.common.persistence.PersistenceProvider;
 import net.epicpunishments.infrastructure.persistence.PersistenceProviderFactory;
+import net.epicpunishments.identity.application.LoginAssessmentService;
+import net.epicpunishments.identity.application.PendingLoginAssessments;
+import net.epicpunishments.identity.application.SuccessfulJoinService;
 import net.epicpunishments.interaction.PaperMainThreadExecutor;
 import net.epicpunishments.interaction.command.CommandManager;
 import net.epicpunishments.interaction.command.EpicPunishmentsCommand;
 import net.epicpunishments.interaction.command.PaperMessageDispatcher;
+import net.epicpunishments.interaction.listener.PaperPlayerNotifications;
+import net.epicpunishments.interaction.listener.PlayerConnectionListener;
+import net.epicpunishments.punishment.application.SessionPunishmentCache;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Objects;
@@ -30,6 +37,8 @@ public final class PluginContainer implements AutoCloseable {
     private static final int EXECUTOR_THREADS = 4;
     private static final int EXECUTOR_QUEUE_CAPACITY = 128;
     private static final Duration SHUTDOWN_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration PENDING_LOGIN_TTL = Duration.ofSeconds(30);
+    private static final int MAXIMUM_PENDING_LOGINS = 2_048;
 
     private final EpicPunishments plugin;
     private final BoundedTaskExecutor taskExecutor;
@@ -37,6 +46,10 @@ public final class PluginContainer implements AutoCloseable {
     private final PaperMainThreadExecutor mainThreadExecutor;
     private final AtomicBoolean stopping = new AtomicBoolean();
     private volatile PersistenceProvider persistenceProvider;
+    private volatile PendingLoginAssessments pendingLogins;
+    private volatile SessionPunishmentCache sessionPunishments;
+    private volatile LoginAssessmentService loginAssessmentService;
+    private volatile SuccessfulJoinService successfulJoinService;
 
     private PluginContainer(
             EpicPunishments plugin,
@@ -114,6 +127,7 @@ public final class PluginContainer implements AutoCloseable {
                 }
                 PersistenceProvider provider = persistenceProvider;
                 String schemaVersion = provider.schemaVersion().toCompletableFuture().join();
+                initializePlayerConnections(snapshot, provider);
                 plugin.getLogger().info("Configuration, messages, and database schema loaded; provider: "
                         + provider.providerName() + ", schema version: " + schemaVersion + '.');
             });
@@ -126,6 +140,14 @@ public final class PluginContainer implements AutoCloseable {
             return;
         }
 
+        LoginAssessmentService logins = loginAssessmentService;
+        if (logins != null) {
+            logins.stop();
+        }
+        SuccessfulJoinService joins = successfulJoinService;
+        if (joins != null) {
+            joins.stop();
+        }
         configurations.stop();
         mainThreadExecutor.close();
         plugin.getServer().getGlobalRegionScheduler().cancelTasks(plugin);
@@ -139,6 +161,62 @@ public final class PluginContainer implements AutoCloseable {
             plugin.getLogger().warning("Cancelled " + shutdown.cancelledTasks()
                     + " queued EpicPunishments task(s) during shutdown.");
         }
+        PendingLoginAssessments pending = pendingLogins;
+        if (pending != null) {
+            pending.clear();
+        }
+        SessionPunishmentCache sessions = sessionPunishments;
+        if (sessions != null) {
+            sessions.clear();
+        }
+    }
+
+    private void initializePlayerConnections(ConfigurationSnapshot snapshot, PersistenceProvider provider) {
+        Clock clock = Clock.systemUTC();
+        var pending = new PendingLoginAssessments(MAXIMUM_PENDING_LOGINS, PENDING_LOGIN_TTL, clock);
+        var sessions = new SessionPunishmentCache();
+        var loginService = new LoginAssessmentService(
+                provider.loginAssessments(),
+                pending,
+                sessions,
+                snapshot.database().queryTimeout(),
+                snapshot.database().loginFailurePolicy()
+        );
+        var joinService = new SuccessfulJoinService(
+                provider.playerIdentities(),
+                provider.loginAssessments(),
+                provider.punishments(),
+                pending,
+                sessions,
+                snapshot.database().loginFailurePolicy(),
+                snapshot.database().queryTimeout()
+        );
+        var notifications = new PaperPlayerNotifications(
+                plugin,
+                mainThreadExecutor,
+                configurations,
+                joinService,
+                clock,
+                plugin.getLogger()
+        );
+        loginAssessmentService = loginService;
+        successfulJoinService = joinService;
+        pendingLogins = pending;
+        sessionPunishments = sessions;
+        plugin.getServer().getPluginManager().registerEvents(new PlayerConnectionListener(
+                loginService,
+                joinService,
+                notifications,
+                configurations,
+                clock,
+                plugin.getLogger()
+        ), plugin);
+        plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(
+                plugin,
+                task -> pending.purgeExpired(),
+                20L,
+                200L
+        );
     }
 
     private void closePersistence() {

@@ -15,7 +15,11 @@ public final class MessageCatalog {
             "command.reload-started",
             "command.reload-success",
             "command.reload-failed",
-            "command.not-ready"
+            "command.not-ready",
+            "login.banned",
+            "login.temporary-error",
+            "login.degraded-warning",
+            "warning.received"
     );
 
     private final Map<String, MessageTemplate> templates;
