@@ -1,6 +1,6 @@
 name: EpicPunishments
 version: '${version}'
 
-main: net.epicPunishments.EpicPunishments
+main: net.epicpunishments.EpicPunishments
 api-version: '26.2'
 load: POSTWORLD

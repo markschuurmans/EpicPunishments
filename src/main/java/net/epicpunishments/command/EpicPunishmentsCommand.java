@@ -1,11 +1,11 @@
-package net.epicPunishments.command;
+package net.epicpunishments.command;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
-import net.epicPunishments.EpicPunishments;
-import net.epicPunishments.command.subcommand.ReloadCommand;
-import net.epicPunishments.command.subcommand.VersionCommand;
+import net.epicpunishments.EpicPunishments;
+import net.epicpunishments.command.subcommand.ReloadCommand;
+import net.epicpunishments.command.subcommand.VersionCommand;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 

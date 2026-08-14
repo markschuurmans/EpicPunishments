@@ -1,10 +1,10 @@
-package net.epicPunishments.command.subcommand;
+package net.epicpunishments.command.subcommand;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
-import net.epicPunishments.EpicPunishments;
-import net.epicPunishments.command.EpicCommand;
+import net.epicpunishments.EpicPunishments;
+import net.epicpunishments.command.EpicCommand;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 
