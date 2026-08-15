@@ -32,6 +32,10 @@ public final class YamlConfigurationLoader implements ConfigurationLoader {
     private static final int DEFAULT_MAXIMUM_REASON_LENGTH = 512;
     private static final int DEFAULT_HISTORY_PAGE_SIZE = 10;
     private static final boolean DEFAULT_CONSOLE_BYPASSES_EXEMPT = true;
+    private static final Duration DEFAULT_REPORT_COOLDOWN = Duration.ofMinutes(5);
+    private static final int DEFAULT_MAXIMUM_REPORT_REASON_LENGTH = 512;
+    private static final int DEFAULT_MAXIMUM_REPORT_RESPONSE_LENGTH = 1_024;
+    private static final int DEFAULT_REPORT_PAGE_SIZE = 10;
 
     private final Path dataDirectory;
     private final ResourceProvider resources;
@@ -60,8 +64,54 @@ public final class YamlConfigurationLoader implements ConfigurationLoader {
         return new ConfigurationSnapshot(
                 readDatabaseConfiguration(configuration),
                 readPunishmentConfiguration(configuration),
+                readReportConfiguration(configuration),
                 readMessageCatalog(messages)
         );
+    }
+
+    private ReportConfiguration readReportConfiguration(Map<String, Object> root) throws ConfigurationException {
+        try {
+            Duration cooldown = optionalString(root, "reports.cooldown")
+                    .map(value -> parseNonNegativeDuration(value, "reports.cooldown", Duration.ofDays(30)))
+                    .orElse(DEFAULT_REPORT_COOLDOWN);
+            return new ReportConfiguration(
+                    cooldown,
+                    optionalInteger(root, "reports.maximum-reason-length", 1, 1_024)
+                            .orElse(DEFAULT_MAXIMUM_REPORT_REASON_LENGTH),
+                    optionalInteger(root, "reports.maximum-response-length", 1, 4_096)
+                            .orElse(DEFAULT_MAXIMUM_REPORT_RESPONSE_LENGTH),
+                    optionalInteger(root, "reports.page-size", 1, 100).orElse(DEFAULT_REPORT_PAGE_SIZE)
+            );
+        } catch (IllegalArgumentException exception) {
+            throw new ConfigurationException(exception.getMessage(), exception);
+        }
+    }
+
+    private static Duration parseNonNegativeDuration(String value, String path, Duration maximum) {
+        if ("0".equals(value)) {
+            return Duration.ZERO;
+        }
+        Matcher matcher = Pattern.compile("([1-9][0-9]*)(s|m|h|d)").matcher(value);
+        if (!matcher.matches()) {
+            throw new IllegalArgumentException(path + " must be 0 or a duration using s, m, h, or d");
+        }
+        long amount;
+        try {
+            amount = Long.parseLong(matcher.group(1));
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(path + " is too large", exception);
+        }
+        Duration parsed = switch (matcher.group(2)) {
+            case "s" -> Duration.ofSeconds(amount);
+            case "m" -> Duration.ofMinutes(amount);
+            case "h" -> Duration.ofHours(amount);
+            case "d" -> Duration.ofDays(amount);
+            default -> throw new IllegalStateException("Unexpected duration unit");
+        };
+        if (parsed.compareTo(maximum) > 0) {
+            throw new IllegalArgumentException(path + " must not exceed 30d");
+        }
+        return parsed;
     }
 
     private PunishmentConfiguration readPunishmentConfiguration(Map<String, Object> root)

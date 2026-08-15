@@ -8,7 +8,7 @@ load: POSTWORLD
 permissions:
   epicpunishments.command:
     description: Allows access to the EpicPunishments command.
-    default: op
+    default: true
   epicpunishments.command.version:
     description: Allows viewing the EpicPunishments version.
     default: op
@@ -59,4 +59,31 @@ permissions:
     default: false
   epicpunishments.notify.punishment:
     description: Receives local punishment notifications.
+    default: op
+  epicpunishments.report.create:
+    description: Allows players to create reports.
+    default: true
+  epicpunishments.report.own:
+    description: Allows players to list and view their own reports.
+    default: true
+  epicpunishments.report.staff.list:
+    description: Allows staff to list reports.
+    default: op
+  epicpunishments.report.staff.view:
+    description: Allows staff to view reports.
+    default: op
+  epicpunishments.report.staff.claim:
+    description: Allows staff to claim reports.
+    default: op
+  epicpunishments.report.staff.respond:
+    description: Allows staff to respond to reports.
+    default: op
+  epicpunishments.report.staff.resolve:
+    description: Allows staff to resolve reports.
+    default: op
+  epicpunishments.report.staff.dismiss:
+    description: Allows staff to dismiss reports.
+    default: op
+  epicpunishments.notify.report:
+    description: Receives new report notifications.
     default: op

@@ -7,6 +7,7 @@ import net.epicpunishments.identity.domain.PlayerAddress;
 import net.epicpunishments.identity.domain.SuccessfulJoin;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.flywaydb.core.Flyway;
 
 import java.nio.file.Path;
 import java.sql.DriverManager;
@@ -27,7 +28,7 @@ class SqlitePersistenceProviderTest {
         Instant joinedAt = Instant.parse("2026-04-01T12:00:00.123456789Z");
 
         try (var first = new SqliteTestContext(databaseFile)) {
-            assertThat(first.provider().schemaVersion().toCompletableFuture().join()).isEqualTo("1");
+            assertThat(first.provider().schemaVersion().toCompletableFuture().join()).isEqualTo("2");
             assertThat(first.provider().health().toCompletableFuture().join()).isEqualTo(PersistenceHealth.HEALTHY);
             first.provider().playerIdentities().recordSuccessfulJoin(new SuccessfulJoin(
                     playerId,
@@ -71,5 +72,28 @@ class SqlitePersistenceProviderTest {
                 .rootCause()
                 .extracting(cause -> ((PersistenceException) cause).kind())
                 .isEqualTo(PersistenceFailureKind.SHUTTING_DOWN);
+    }
+
+    @Test
+    void migratesAnExistingVersionOneDatabaseToDuplicateProtectedReports() throws Exception {
+        Path databaseFile = temporaryDirectory.resolve("version-one.db");
+        Flyway.configure(getClass().getClassLoader())
+                .dataSource("jdbc:sqlite:" + databaseFile, null, null)
+                .locations("classpath:db/migration/sqlite")
+                .target("1")
+                .load()
+                .migrate();
+
+        try (var context = new SqliteTestContext(databaseFile)) {
+            assertThat(context.provider().schemaVersion().toCompletableFuture().join()).isEqualTo("2");
+        }
+        try (var connection = DriverManager.getConnection("jdbc:sqlite:" + databaseFile);
+             var statement = connection.prepareStatement("""
+                     SELECT 1 FROM sqlite_master
+                     WHERE type = 'index' AND name = 'reports_open_participants_unique_idx'
+                     """);
+             var results = statement.executeQuery()) {
+            assertThat(results.next()).isTrue();
+        }
     }
 }

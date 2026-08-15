@@ -7,6 +7,8 @@ import net.epicpunishments.common.config.ConfigurationService;
 import net.epicpunishments.interaction.command.subcommand.ReloadCommand;
 import net.epicpunishments.interaction.command.subcommand.PunishCommand;
 import net.epicpunishments.interaction.command.subcommand.VersionCommand;
+import net.epicpunishments.interaction.command.subcommand.ReportCommand;
+import net.epicpunishments.interaction.command.subcommand.ReportsCommand;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 
@@ -27,6 +29,7 @@ public final class EpicPunishmentsCommand implements EpicCommand {
             String version,
             PaperMessageDispatcher messageDispatcher,
             Supplier<Optional<PunishmentCommandRuntime>> punishmentRuntime,
+            Supplier<Optional<ReportCommandRuntime>> reportRuntime,
             Server server,
             Clock clock,
             Logger logger
@@ -35,7 +38,9 @@ public final class EpicPunishmentsCommand implements EpicCommand {
         this.subcommands = List.of(
                 new VersionCommand(configurations, version),
                 new ReloadCommand(configurations, messageDispatcher, logger),
-                new PunishCommand(configurations, messageDispatcher, punishmentRuntime, server, clock, logger)
+                new PunishCommand(configurations, messageDispatcher, punishmentRuntime, server, clock, logger),
+                new ReportCommand(configurations, messageDispatcher, reportRuntime, logger),
+                new ReportsCommand(configurations, messageDispatcher, reportRuntime, logger)
         );
     }
 

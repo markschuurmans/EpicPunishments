@@ -15,6 +15,10 @@ import java.util.concurrent.CompletionStage;
 public interface ReportRepository {
     CompletionStage<Optional<Report>> findById(UUID reportId);
 
+    CompletionStage<Optional<Report>> findLatestByReporter(UUID reporterId);
+
+    CompletionStage<Optional<Report>> findOpenByParticipants(UUID reporterId, UUID reportedId);
+
     CompletionStage<Page<Report>> findByReporter(UUID reporterId, PageRequest pageRequest);
 
     CompletionStage<Page<Report>> findByStatus(Optional<ReportStatus> status, PageRequest pageRequest);

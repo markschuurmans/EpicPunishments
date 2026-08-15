@@ -20,6 +20,8 @@ import net.epicpunishments.interaction.command.CommandManager;
 import net.epicpunishments.interaction.command.EpicPunishmentsCommand;
 import net.epicpunishments.interaction.command.PaperMessageDispatcher;
 import net.epicpunishments.interaction.command.PunishmentCommandRuntime;
+import net.epicpunishments.interaction.command.ReportCommandRuntime;
+import net.epicpunishments.interaction.listener.PaperReportNotifications;
 import net.epicpunishments.interaction.listener.PaperPlayerNotifications;
 import net.epicpunishments.interaction.listener.PaperPunishmentEnforcer;
 import net.epicpunishments.interaction.listener.PlayerConnectionListener;
@@ -31,6 +33,7 @@ import net.epicpunishments.punishment.application.PlayerTargetParser;
 import net.epicpunishments.punishment.application.PlayerTargetResolver;
 import net.epicpunishments.punishment.application.SessionPunishmentCache;
 import net.epicpunishments.punishment.application.TargetAuthorizationService;
+import net.epicpunishments.report.application.ReportService;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -65,6 +68,8 @@ public final class PluginContainer implements AutoCloseable {
     private volatile PlayerPunishmentService playerPunishmentService;
     private volatile AddressPunishmentService addressPunishmentService;
     private volatile PunishmentCommandRuntime punishmentCommandRuntime;
+    private volatile ReportService reportService;
+    private volatile ReportCommandRuntime reportCommandRuntime;
 
     private PluginContainer(
             EpicPunishments plugin,
@@ -108,6 +113,7 @@ public final class PluginContainer implements AutoCloseable {
                 plugin.getPluginMeta().getVersion(),
                 dispatcher,
                 () -> Optional.ofNullable(punishmentCommandRuntime),
+                () -> Optional.ofNullable(reportCommandRuntime),
                 plugin.getServer(),
                 clock,
                 plugin.getLogger()
@@ -174,7 +180,12 @@ public final class PluginContainer implements AutoCloseable {
         if (addressPunishments != null) {
             addressPunishments.stop();
         }
+        ReportService reports = reportService;
+        if (reports != null) {
+            reports.stop();
+        }
         punishmentCommandRuntime = null;
+        reportCommandRuntime = null;
         configurations.stop();
         mainThreadExecutor.close();
         plugin.getServer().getGlobalRegionScheduler().cancelTasks(plugin);
@@ -248,6 +259,16 @@ public final class PluginContainer implements AutoCloseable {
                 clock,
                 plugin.getLogger()
         );
+        var reports = new ReportService(
+                provider.playerIdentities(),
+                provider.reports(),
+                provider.reportMutations(),
+                () -> configurations.current().map(ConfigurationSnapshot::reports).orElse(snapshot.reports()),
+                clock
+        );
+        var reportNotifications = new PaperReportNotifications(
+                plugin, mainThreadExecutor, configurations, reports, clock, plugin.getLogger()
+        );
         loginAssessmentService = loginService;
         successfulJoinService = joinService;
         playerPunishmentService = playerPunishments;
@@ -260,12 +281,15 @@ public final class PluginContainer implements AutoCloseable {
                 addressPunishments,
                 punishmentEnforcer
         );
+        reportService = reports;
+        reportCommandRuntime = new ReportCommandRuntime(reports, reportNotifications);
         pendingLogins = pending;
         sessionPunishments = sessions;
         plugin.getServer().getPluginManager().registerEvents(new PlayerConnectionListener(
                 loginService,
                 joinService,
                 notifications,
+                reportNotifications,
                 configurations,
                 clock,
                 plugin.getLogger()

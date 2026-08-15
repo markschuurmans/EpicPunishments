@@ -35,7 +35,31 @@ public final class MessageCatalog {
             "punishment.command-failed",
             "punishment.unsupported-sender",
             "punishment.muted",
-            "punishment.mute-blocked"
+            "punishment.mute-blocked",
+            "report.usage",
+            "reports.usage",
+            "report.invalid-input",
+            "report.player-only",
+            "report.unsupported-sender",
+            "report.created",
+            "report.updated",
+            "report.details",
+            "report.not-found",
+            "report.not-owner",
+            "report.target-not-found",
+            "report.target-ambiguous",
+            "report.self",
+            "report.cooldown",
+            "report.duplicate",
+            "report.version-conflict",
+            "report.invalid-state",
+            "report.list-header",
+            "report.list-entry",
+            "report.list-empty",
+            "report.response-entry",
+            "report.command-failed",
+            "report.staff-notification",
+            "report.notification"
     );
 
     private final Map<String, MessageTemplate> templates;

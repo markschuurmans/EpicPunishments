@@ -28,6 +28,7 @@ public final class PlayerConnectionListener implements Listener {
     private final LoginAssessmentService logins;
     private final SuccessfulJoinService joins;
     private final PaperPlayerNotifications notifications;
+    private final PaperReportNotifications reportNotifications;
     private final ConfigurationService configurations;
     private final Clock clock;
     private final Logger logger;
@@ -36,6 +37,7 @@ public final class PlayerConnectionListener implements Listener {
             LoginAssessmentService logins,
             SuccessfulJoinService joins,
             PaperPlayerNotifications notifications,
+            PaperReportNotifications reportNotifications,
             ConfigurationService configurations,
             Clock clock,
             Logger logger
@@ -43,6 +45,7 @@ public final class PlayerConnectionListener implements Listener {
         this.logins = Objects.requireNonNull(logins, "logins");
         this.joins = Objects.requireNonNull(joins, "joins");
         this.notifications = Objects.requireNonNull(notifications, "notifications");
+        this.reportNotifications = Objects.requireNonNull(reportNotifications, "reportNotifications");
         this.configurations = Objects.requireNonNull(configurations, "configurations");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.logger = Objects.requireNonNull(logger, "logger");
@@ -84,6 +87,7 @@ public final class PlayerConnectionListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(PlayerJoinEvent event) {
         UUID playerId = event.getPlayer().getUniqueId();
+        reportNotifications.deliverUnread(playerId);
         String playerName = event.getPlayer().getName();
         InetSocketAddress socketAddress = event.getPlayer().getAddress();
         if (socketAddress == null || socketAddress.getAddress() == null) {

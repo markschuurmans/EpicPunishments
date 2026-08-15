@@ -188,6 +188,27 @@ final class SqliteReportStore implements ReportRepository, ReportMutationStore {
     }
 
     @Override
+    public CompletionStage<Optional<Report>> findLatestByReporter(UUID reporterId) {
+        Objects.requireNonNull(reporterId, "reporterId");
+        return database.read(connection -> findFirst(connection, "reporter_uuid = ?", statement ->
+                statement.setString(1, SqliteMappings.uuid(reporterId))));
+    }
+
+    @Override
+    public CompletionStage<Optional<Report>> findOpenByParticipants(UUID reporterId, UUID reportedId) {
+        Objects.requireNonNull(reporterId, "reporterId");
+        Objects.requireNonNull(reportedId, "reportedId");
+        return database.read(connection -> findFirst(
+                connection,
+                "reporter_uuid = ? AND reported_uuid = ? AND status IN ('OPEN', 'IN_REVIEW')",
+                statement -> {
+                    statement.setString(1, SqliteMappings.uuid(reporterId));
+                    statement.setString(2, SqliteMappings.uuid(reportedId));
+                }
+        ));
+    }
+
+    @Override
     public CompletionStage<Page<Report>> findByReporter(UUID reporterId, PageRequest pageRequest) {
         Objects.requireNonNull(reporterId, "reporterId");
         Objects.requireNonNull(pageRequest, "pageRequest");
@@ -271,9 +292,12 @@ final class SqliteReportStore implements ReportRepository, ReportMutationStore {
             AuditEntry auditEntry
     ) {
         Objects.requireNonNull(reportId, "reportId");
-        if (response.isEmpty() && notification.isPresent()) {
-            throw new IllegalArgumentException("A response notification requires a response");
-        }
+        notification.ifPresent(value -> {
+            if (!value.reportId().equals(reportId)
+                    || !value.responseId().equals(response.map(ReportResponse::id))) {
+                throw new IllegalArgumentException("Notification does not refer to the report response");
+            }
+        });
         response.ifPresent(value -> validateRelatedRecords(reportId, value, notification));
         requireMatchingAudit(reportId, auditEntry);
         return database.transaction(connection -> {
@@ -362,6 +386,20 @@ final class SqliteReportStore implements ReportRepository, ReportMutationStore {
     private Optional<Report> findById(Connection connection, UUID reportId) throws SQLException {
         try (PreparedStatement statement = database.prepare(connection, REPORT_COLUMNS + " WHERE report_uuid = ?")) {
             statement.setString(1, SqliteMappings.uuid(reportId));
+            try (ResultSet results = statement.executeQuery()) {
+                return results.next() ? Optional.of(SqliteMappings.report(results)) : Optional.empty();
+            }
+        }
+    }
+
+    private Optional<Report> findFirst(
+            Connection connection,
+            String predicate,
+            StatementBinder binder
+    ) throws SQLException {
+        try (PreparedStatement statement = database.prepare(connection,
+                REPORT_COLUMNS + " WHERE " + predicate + " ORDER BY created_at DESC, report_uuid LIMIT 1")) {
+            binder.bind(statement);
             try (ResultSet results = statement.executeQuery()) {
                 return results.next() ? Optional.of(SqliteMappings.report(results)) : Optional.empty();
             }

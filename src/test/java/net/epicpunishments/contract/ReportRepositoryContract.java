@@ -51,6 +51,22 @@ public abstract class ReportRepositoryContract {
     }
 
     @Test
+    final void preventsConcurrentOpenDuplicatesAtTheStorageBoundary() {
+        UUID reporterId = UUID.randomUUID();
+        UUID reportedId = UUID.randomUUID();
+        Report first = report(reporterId, reportedId, NOW);
+        Report duplicate = report(reporterId, reportedId, NOW.plusSeconds(1));
+        create(first);
+
+        assertThatThrownBy(() -> fixture.mutations().createReport(
+                duplicate, audit(duplicate.id(), "report.create")
+        ).toCompletableFuture().join()).hasCauseInstanceOf(
+                net.epicpunishments.common.persistence.PersistenceException.class
+        );
+        assertThat(fixture.auditEntries()).hasSize(1);
+    }
+
+    @Test
     final void optimisticClaimDoesNotSilentlyOverwrite() {
         Report report = report(UUID.randomUUID(), UUID.randomUUID(), NOW);
         create(report);
@@ -152,6 +168,29 @@ public abstract class ReportRepositoryContract {
         assertThat(openReports.totalItems()).isEqualTo(3);
         assertThat(allReportsSecondPage.items()).containsExactly(oldest);
         assertThat(allReportsSecondPage.totalItems()).isEqualTo(3);
+        assertThat(fixture.reports().findLatestByReporter(reporterId).toCompletableFuture().join())
+                .contains(newest);
+        assertThat(fixture.reports().findOpenByParticipants(reporterId, newest.reported().playerId())
+                .toCompletableFuture().join()).contains(newest);
+    }
+
+    @Test
+    final void recordsStatusOnlyResolutionNotification() {
+        Report report = report(UUID.randomUUID(), UUID.randomUUID(), NOW);
+        create(report);
+        ReportNotification notification = new ReportNotification(
+                UUID.randomUUID(), report.reporter().playerId(), report.id(), Optional.empty(),
+                NOW.plusSeconds(1), Optional.empty()
+        );
+
+        fixture.mutations().resolveReport(
+                report.id(), 0, NOW.plusSeconds(1), Optional.empty(), Optional.of(notification),
+                audit(report.id(), "report.resolve")
+        ).toCompletableFuture().join();
+
+        assertThat(fixture.reports().findUnreadNotifications(report.reporter().playerId())
+                .toCompletableFuture().join()).containsExactly(notification);
+        assertThat(fixture.reports().findResponses(report.id()).toCompletableFuture().join()).isEmpty();
     }
 
     @Test

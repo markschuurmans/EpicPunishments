@@ -26,6 +26,7 @@ class BundledConfigurationTest {
         ConfigurationSnapshot snapshot = loader.load();
 
         assertThat(snapshot.database().type()).isEqualTo(DatabaseType.SQLITE);
+        assertThat(snapshot.reports().cooldown()).isEqualTo(java.time.Duration.ofMinutes(5));
         assertThat(PlainTextComponentSerializer.plainText().serialize(
                 snapshot.messages().message("command.usage")
         )).isEqualTo("Use /epicpunishments <subcommand>.");

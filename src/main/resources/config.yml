@@ -27,3 +27,9 @@ punishments:
   maximum-reason-length: 512
   history-page-size: 10
   console-bypasses-exempt: true
+
+reports:
+  cooldown: 5m
+  maximum-reason-length: 512
+  maximum-response-length: 1024
+  page-size: 10

@@ -34,6 +34,15 @@ class PluginMetadataTest {
                     .contains("epicpunishments.punishment.history.ip:")
                     .contains("epicpunishments.punishment.override-exempt:")
                     .contains("epicpunishments.exempt:")
+                    .contains("epicpunishments.report.create:")
+                    .contains("epicpunishments.report.own:")
+                    .contains("epicpunishments.report.staff.list:")
+                    .contains("epicpunishments.report.staff.view:")
+                    .contains("epicpunishments.report.staff.claim:")
+                    .contains("epicpunishments.report.staff.respond:")
+                    .contains("epicpunishments.report.staff.resolve:")
+                    .contains("epicpunishments.report.staff.dismiss:")
+                    .contains("epicpunishments.notify.report:")
                     .doesNotContain("${version}")
                     .doesNotContain("net.epicPunishments");
         }
@@ -48,6 +57,10 @@ class PluginMetadataTest {
         assertThat(classLoader.getResource("net/epicpunishments/interaction/command/EpicPunishmentsCommand.class"))
                 .isNotNull();
         assertThat(classLoader.getResource("net/epicpunishments/interaction/command/subcommand/PunishCommand.class"))
+                .isNotNull();
+        assertThat(classLoader.getResource("net/epicpunishments/interaction/command/subcommand/ReportCommand.class"))
+                .isNotNull();
+        assertThat(classLoader.getResource("net/epicpunishments/interaction/command/subcommand/ReportsCommand.class"))
                 .isNotNull();
         assertThat(classLoader.getResource("config.yml")).isNotNull();
         assertThat(classLoader.getResource("messages.yml")).isNotNull();

@@ -32,6 +32,9 @@ class YamlConfigurationLoaderTest {
         assertThat(snapshot.punishments()).isEqualTo(new PunishmentConfiguration(
                 Duration.ofDays(365), 512, 10, true
         ));
+        assertThat(snapshot.reports()).isEqualTo(new ReportConfiguration(
+                Duration.ofMinutes(5), 512, 1_024, 10
+        ));
         assertThat(snapshot.database().connection())
                 .isEqualTo(new SqliteConnectionConfiguration(temporaryDirectory.resolve("epicpunishments.db")));
     }
@@ -199,6 +202,32 @@ class YamlConfigurationLoaderTest {
                   unsupported-sender: "<red>Unsupported</red>"
                   muted: "<red>{reason}</red>"
                   mute-blocked: "<red>{reason}</red>"
+                report:
+                  usage: "<gold>Usage</gold>"
+                  invalid-input: "<red>{error}</red>"
+                  player-only: "<red>Player only</red>"
+                  unsupported-sender: "<red>Unsupported</red>"
+                  created: "<green>{id} {reported}</green>"
+                  updated: "<green>{id} {status}</green>"
+                  details: "<gold>{id} {reporter} {reported} {status} {assignee} {reason}</gold>"
+                  not-found: "<red>Not found</red>"
+                  not-owner: "<red>Not owner</red>"
+                  target-not-found: "<red>Target missing</red>"
+                  target-ambiguous: "<red>Ambiguous</red>"
+                  self: "<red>Self</red>"
+                  cooldown: "<yellow>Cooldown</yellow>"
+                  duplicate: "<yellow>Duplicate</yellow>"
+                  version-conflict: "<yellow>Conflict</yellow>"
+                  invalid-state: "<yellow>Invalid state</yellow>"
+                  list-header: "<gold>{page} {pages}</gold>"
+                  list-entry: "<gray>{id} {reported} {status} {created}</gray>"
+                  list-empty: "<yellow>Empty</yellow>"
+                  response-entry: "<gray>{created} {actor} {message}</gray>"
+                  command-failed: "<red>Failed</red>"
+                  staff-notification: "<gold>{id} {reporter} {reported}</gold>"
+                  notification: "<gold>{id}</gold>"
+                reports:
+                  usage: "<gold>Usage</gold>"
                 """;
     }
 }

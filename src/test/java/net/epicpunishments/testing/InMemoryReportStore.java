@@ -64,6 +64,14 @@ public final class InMemoryReportStore implements ReportRepository, ReportMutati
                     "Report already exists"
             ));
         }
+        if (storedReports.values().stream().anyMatch(existing -> !existing.isClosed()
+                && existing.reporter().playerId().equals(report.reporter().playerId())
+                && existing.reported().playerId().equals(report.reported().playerId()))) {
+            return CompletableFuture.failedFuture(new PersistenceException(
+                    PersistenceFailureKind.CONFLICT,
+                    "An open report already exists for these participants"
+            ));
+        }
         requireMatchingAudit(report.id(), auditEntry);
         storedReports.put(report.id(), report);
         storedAuditEntries.add(auditEntry);
@@ -184,6 +192,22 @@ public final class InMemoryReportStore implements ReportRepository, ReportMutati
     }
 
     @Override
+    public synchronized CompletionStage<Optional<Report>> findLatestByReporter(UUID reporterId) {
+        return CompletableFuture.completedFuture(storedReports.values().stream()
+                .filter(report -> report.reporter().playerId().equals(reporterId))
+                .max(Comparator.comparing(Report::createdAt).thenComparing(report -> report.id().toString())));
+    }
+
+    @Override
+    public synchronized CompletionStage<Optional<Report>> findOpenByParticipants(UUID reporterId, UUID reportedId) {
+        return CompletableFuture.completedFuture(storedReports.values().stream()
+                .filter(report -> report.reporter().playerId().equals(reporterId))
+                .filter(report -> report.reported().playerId().equals(reportedId))
+                .filter(report -> !report.isClosed())
+                .max(Comparator.comparing(Report::createdAt).thenComparing(report -> report.id().toString())));
+    }
+
+    @Override
     public synchronized CompletionStage<Page<Report>> findByReporter(UUID reporterId, PageRequest pageRequest) {
         return CompletableFuture.completedFuture(page(
                 report -> report.reporter().playerId().equals(reporterId),
@@ -232,9 +256,12 @@ public final class InMemoryReportStore implements ReportRepository, ReportMutati
             return CompletableFuture.completedFuture(rejected);
         }
         response.ifPresent(value -> validateRelatedRecords(reportId, value, notification));
-        if (response.isEmpty() && notification.isPresent()) {
-            throw new IllegalArgumentException("A response notification requires a response");
-        }
+        notification.ifPresent(value -> {
+            if (!value.reportId().equals(reportId)
+                    || !value.responseId().equals(response.map(ReportResponse::id))) {
+                throw new IllegalArgumentException("Notification does not refer to the report response");
+            }
+        });
         if (consumeAuditFailure()) {
             return failedAuditWrite();
         }
