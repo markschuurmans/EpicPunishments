@@ -19,7 +19,23 @@ public final class MessageCatalog {
             "login.banned",
             "login.temporary-error",
             "login.degraded-warning",
-            "warning.received"
+            "warning.received",
+            "punishment.usage",
+            "punishment.invalid-input",
+            "punishment.invalid-target",
+            "punishment.target-not-found",
+            "punishment.target-ambiguous",
+            "punishment.target-exempt",
+            "punishment.applied",
+            "punishment.revoked",
+            "punishment.no-active",
+            "punishment.history-header",
+            "punishment.history-entry",
+            "punishment.history-empty",
+            "punishment.command-failed",
+            "punishment.unsupported-sender",
+            "punishment.muted",
+            "punishment.mute-blocked"
     );
 
     private final Map<String, MessageTemplate> templates;

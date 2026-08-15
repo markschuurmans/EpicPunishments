@@ -6,10 +6,12 @@ import java.util.Objects;
 
 public record ConfigurationSnapshot(
         DatabaseConfiguration database,
+        PunishmentConfiguration punishments,
         MessageCatalog messages
 ) {
     public ConfigurationSnapshot {
         Objects.requireNonNull(database, "database");
+        Objects.requireNonNull(punishments, "punishments");
         Objects.requireNonNull(messages, "messages");
     }
 }

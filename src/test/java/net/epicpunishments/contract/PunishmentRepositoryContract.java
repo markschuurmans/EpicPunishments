@@ -143,6 +143,23 @@ public abstract class PunishmentRepositoryContract {
     }
 
     @Test
+    final void historyCanBeFilteredByPunishmentTypeBeforePagination() {
+        PunishmentTarget target = new PlayerPunishmentTarget(UUID.randomUUID());
+        create(punishment(PunishmentType.BAN, target, NOW, Optional.empty()));
+        Punishment warning = punishment(PunishmentType.WARNING, target, NOW.plusSeconds(1), Optional.empty());
+        create(warning);
+
+        var page = fixture.punishments().findHistory(
+                target,
+                Optional.of(PunishmentType.WARNING),
+                new PageRequest(0, 1)
+        ).toCompletableFuture().join();
+
+        assertThat(page.totalItems()).isEqualTo(1);
+        assertThat(page.items()).containsExactly(warning);
+    }
+
+    @Test
     final void competingRevocationsCannotBothApply() {
         Punishment punishment = punishment(
                 PunishmentType.BAN,

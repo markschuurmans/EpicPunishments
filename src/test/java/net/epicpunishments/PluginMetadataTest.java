@@ -21,6 +21,15 @@ class PluginMetadataTest {
                     .contains("main: net.epicpunishments.bootstrap.EpicPunishments")
                     .contains("api-version: '26.2'")
                     .contains("epicpunishments.command.reload:")
+                    .contains("epicpunishments.punishment.ban:")
+                    .contains("epicpunishments.punishment.unban:")
+                    .contains("epicpunishments.punishment.mute:")
+                    .contains("epicpunishments.punishment.unmute:")
+                    .contains("epicpunishments.punishment.warn:")
+                    .contains("epicpunishments.punishment.warnings:")
+                    .contains("epicpunishments.punishment.history:")
+                    .contains("epicpunishments.punishment.override-exempt:")
+                    .contains("epicpunishments.exempt:")
                     .doesNotContain("${version}")
                     .doesNotContain("net.epicPunishments");
         }
@@ -33,6 +42,8 @@ class PluginMetadataTest {
         assertThat(classLoader.getResource("net/epicpunishments/bootstrap/EpicPunishments.class")).isNotNull();
         assertThat(classLoader.getResource("net/epicpunishments/bootstrap/PluginContainer.class")).isNotNull();
         assertThat(classLoader.getResource("net/epicpunishments/interaction/command/EpicPunishmentsCommand.class"))
+                .isNotNull();
+        assertThat(classLoader.getResource("net/epicpunishments/interaction/command/subcommand/PunishCommand.class"))
                 .isNotNull();
         assertThat(classLoader.getResource("config.yml")).isNotNull();
         assertThat(classLoader.getResource("messages.yml")).isNotNull();

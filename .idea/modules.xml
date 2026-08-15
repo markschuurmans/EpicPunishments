@@ -4,6 +4,7 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/EpicPunishments.iml" filepath="$PROJECT_DIR$/.idea/modules/EpicPunishments.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/EpicPunishments.main.iml" filepath="$PROJECT_DIR$/.idea/modules/EpicPunishments.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/EpicPunishments.test.iml" filepath="$PROJECT_DIR$/.idea/modules/EpicPunishments.test.iml" />
     </modules>
   </component>
 </project>

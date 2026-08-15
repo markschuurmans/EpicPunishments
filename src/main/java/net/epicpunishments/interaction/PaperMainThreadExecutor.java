@@ -15,9 +15,16 @@ public final class PaperMainThreadExecutor implements Executor, AutoCloseable {
 
     @Override
     public synchronized void execute(Runnable command) {
-        if (!closed) {
-            plugin.getServer().getGlobalRegionScheduler().execute(plugin, command);
+        tryExecute(command);
+    }
+
+    public synchronized boolean tryExecute(Runnable command) {
+        Objects.requireNonNull(command, "command");
+        if (closed) {
+            return false;
         }
+        plugin.getServer().getGlobalRegionScheduler().execute(plugin, command);
+        return true;
     }
 
     @Override

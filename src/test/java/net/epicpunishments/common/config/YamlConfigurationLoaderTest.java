@@ -29,6 +29,9 @@ class YamlConfigurationLoaderTest {
         assertThat(snapshot.database().type()).isEqualTo(DatabaseType.SQLITE);
         assertThat(snapshot.database().queryTimeout()).isEqualTo(Duration.ofSeconds(3));
         assertThat(snapshot.database().loginFailurePolicy()).isEqualTo(LoginFailurePolicy.DENY);
+        assertThat(snapshot.punishments()).isEqualTo(new PunishmentConfiguration(
+                Duration.ofDays(365), 512, 10, true
+        ));
         assertThat(snapshot.database().connection())
                 .isEqualTo(new SqliteConnectionConfiguration(temporaryDirectory.resolve("epicpunishments.db")));
     }
@@ -71,6 +74,15 @@ class YamlConfigurationLoaderTest {
                 .isInstanceOf(ConfigurationException.class)
                 .hasMessageContaining("MISSING_PASSWORD")
                 .hasMessageNotContaining("null");
+
+        assertThatThrownBy(() -> loaderAt(
+                temporaryDirectory.resolve("punishment-duration"),
+                sqliteConfig("3s") + "\npunishments:\n  maximum-duration: 3651d\n",
+                messages(),
+                Map.of()
+        ).load())
+                .isInstanceOf(ConfigurationException.class)
+                .hasMessageContaining("must not exceed 3650d");
 
         Path duplicateDirectory = temporaryDirectory.resolve("duplicate");
         Files.createDirectories(duplicateDirectory);
@@ -170,6 +182,23 @@ class YamlConfigurationLoaderTest {
                   degraded-warning: "<red>Degraded for {player-id}</red>"
                 warning:
                   received: "<gold>Warning: {reason}</gold>"
+                punishment:
+                  usage: "<gold>Usage</gold>"
+                  invalid-input: "<red>{error}</red>"
+                  invalid-target: "<red>Invalid target</red>"
+                  target-not-found: "<red>Not found</red>"
+                  target-ambiguous: "<red>Ambiguous</red>"
+                  target-exempt: "<red>Exempt</red>"
+                  applied: "<green>{type} {player}</green>"
+                  revoked: "<green>{count} {type} {player}</green>"
+                  no-active: "<yellow>None</yellow>"
+                  history-header: "<gold>{player} {page} {pages}</gold>"
+                  history-entry: "<gray>{id} {type} {created} {status} {reason}</gray>"
+                  history-empty: "<yellow>Empty</yellow>"
+                  command-failed: "<red>Failed</red>"
+                  unsupported-sender: "<red>Unsupported</red>"
+                  muted: "<red>{reason}</red>"
+                  mute-blocked: "<red>{reason}</red>"
                 """;
     }
 }

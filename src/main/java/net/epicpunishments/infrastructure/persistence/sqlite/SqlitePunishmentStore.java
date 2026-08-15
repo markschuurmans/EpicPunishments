@@ -124,21 +124,31 @@ final class SqlitePunishmentStore implements PunishmentRepository, ModerationMut
     }
 
     @Override
-    public CompletionStage<Page<Punishment>> findHistory(PunishmentTarget target, PageRequest pageRequest) {
+    public CompletionStage<Page<Punishment>> findHistory(
+            PunishmentTarget target,
+            Optional<PunishmentType> type,
+            PageRequest pageRequest
+    ) {
         Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(type, "type");
         Objects.requireNonNull(pageRequest, "pageRequest");
         return database.read(connection -> {
-            String predicate = target instanceof PlayerPunishmentTarget
+            String targetPredicate = target instanceof PlayerPunishmentTarget
                     ? "p.target_type = 'PLAYER' AND p.target_player_uuid = ?"
                     : "p.target_type = 'IP_ADDRESS' AND a.address_bytes = ?";
-            long total = countHistory(connection, predicate, target);
+            String predicate = targetPredicate + (type.isPresent() ? " AND p.punishment_type = ?" : "");
+            long total = countHistory(connection, predicate, target, type);
             var punishments = new ArrayList<Punishment>();
             String sql = PUNISHMENT_COLUMNS + " WHERE " + predicate
                     + " ORDER BY p.created_at DESC, p.punishment_uuid LIMIT ? OFFSET ?";
             try (PreparedStatement statement = database.prepare(connection, sql)) {
                 bindTarget(statement, 1, target);
-                statement.setInt(2, pageRequest.size());
-                statement.setLong(3, pageRequest.offset());
+                int nextIndex = 2;
+                if (type.isPresent()) {
+                    statement.setString(nextIndex++, type.orElseThrow().name());
+                }
+                statement.setInt(nextIndex++, pageRequest.size());
+                statement.setLong(nextIndex, pageRequest.offset());
                 try (ResultSet results = statement.executeQuery()) {
                     while (results.next()) {
                         punishments.add(SqliteMappings.punishment(results));
@@ -354,12 +364,20 @@ final class SqlitePunishmentStore implements PunishmentRepository, ModerationMut
         }
     }
 
-    private long countHistory(Connection connection, String predicate, PunishmentTarget target) throws SQLException {
+    private long countHistory(
+            Connection connection,
+            String predicate,
+            PunishmentTarget target,
+            Optional<PunishmentType> type
+    ) throws SQLException {
         try (PreparedStatement statement = database.prepare(connection,
                 "SELECT count(*) FROM punishments p "
                         + "LEFT JOIN addresses a ON a.address_id = p.target_address_id WHERE "
                         + predicate)) {
             bindTarget(statement, 1, target);
+            if (type.isPresent()) {
+                statement.setString(2, type.orElseThrow().name());
+            }
             try (ResultSet results = statement.executeQuery()) {
                 results.next();
                 return results.getLong(1);

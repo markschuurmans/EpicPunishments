@@ -5,6 +5,7 @@ import com.mojang.brigadier.context.CommandContext;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import net.epicpunishments.common.config.ConfigurationService;
 import net.epicpunishments.interaction.command.subcommand.ReloadCommand;
+import net.epicpunishments.interaction.command.subcommand.PunishCommand;
 import net.epicpunishments.interaction.command.subcommand.VersionCommand;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -12,6 +13,10 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import java.util.Collection;
 import java.util.List;
 import java.util.logging.Logger;
+import java.util.Optional;
+import java.util.function.Supplier;
+import java.time.Clock;
+import org.bukkit.Server;
 
 public final class EpicPunishmentsCommand implements EpicCommand {
     private final ConfigurationService configurations;
@@ -21,12 +26,16 @@ public final class EpicPunishmentsCommand implements EpicCommand {
             ConfigurationService configurations,
             String version,
             PaperMessageDispatcher messageDispatcher,
+            Supplier<Optional<PunishmentCommandRuntime>> punishmentRuntime,
+            Server server,
+            Clock clock,
             Logger logger
     ) {
         this.configurations = configurations;
         this.subcommands = List.of(
                 new VersionCommand(configurations, version),
-                new ReloadCommand(configurations, messageDispatcher, logger)
+                new ReloadCommand(configurations, messageDispatcher, logger),
+                new PunishCommand(configurations, messageDispatcher, punishmentRuntime, server, clock, logger)
         );
     }
 

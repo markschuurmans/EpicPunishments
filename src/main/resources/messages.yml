@@ -13,3 +13,21 @@ login:
 
 warning:
   received: "<gold>Warning: <yellow>{reason}</yellow></gold>"
+
+punishment:
+  usage: '<gold>Use <yellow>/epicpunishments punish <ban|unban|mute|unmute|warn|warnings|history></yellow>.</gold>'
+  invalid-input: '<red>Invalid punishment input: {error}</red>'
+  invalid-target: '<red>Use an explicit player target such as player:Name or player:UUID.</red>'
+  target-not-found: '<red>No stored player matches that target.</red>'
+  target-ambiguous: '<red>That historical name matches multiple players; use player:UUID.</red>'
+  target-exempt: '<red>That player is exempt from punishments.</red>'
+  applied: '<green>Applied {type} to {player}.</green>'
+  revoked: '<green>Revoked {count} active {type} punishment(s) for {player}.</green>'
+  no-active: '<yellow>No matching active punishment was found.</yellow>'
+  history-header: '<gold>Punishment history for {player} (page {page}/{pages}):</gold>'
+  history-entry: '<gray>{id} | {type} | {created} | {status} | {reason}</gray>'
+  history-empty: '<yellow>No punishments were found on that page.</yellow>'
+  command-failed: '<red>The moderation change could not be completed; no uncommitted local state was applied.</red>'
+  unsupported-sender: '<red>This command can be used only by a player or the console.</red>'
+  muted: '<red>You have been muted: {reason}</red>'
+  mute-blocked: '<red>You cannot chat while muted: {reason}</red>'

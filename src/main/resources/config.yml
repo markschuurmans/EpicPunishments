@@ -21,3 +21,9 @@ database:
     username: postgres
     password: ${EPIC_DB_PASSWORD}
     pool-size: 8
+
+punishments:
+  maximum-duration: 365d
+  maximum-reason-length: 512
+  history-page-size: 10
+  console-bypasses-exempt: true

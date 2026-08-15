@@ -15,17 +15,26 @@ import net.epicpunishments.identity.application.LoginAssessmentService;
 import net.epicpunishments.identity.application.PendingLoginAssessments;
 import net.epicpunishments.identity.application.SuccessfulJoinService;
 import net.epicpunishments.interaction.PaperMainThreadExecutor;
+import net.epicpunishments.interaction.PaperPlayerExemptionLookup;
 import net.epicpunishments.interaction.command.CommandManager;
 import net.epicpunishments.interaction.command.EpicPunishmentsCommand;
 import net.epicpunishments.interaction.command.PaperMessageDispatcher;
+import net.epicpunishments.interaction.command.PunishmentCommandRuntime;
 import net.epicpunishments.interaction.listener.PaperPlayerNotifications;
+import net.epicpunishments.interaction.listener.PaperPunishmentEnforcer;
 import net.epicpunishments.interaction.listener.PlayerConnectionListener;
+import net.epicpunishments.interaction.listener.PlayerMuteListener;
+import net.epicpunishments.punishment.application.PlayerPunishmentService;
+import net.epicpunishments.punishment.application.PlayerTargetParser;
+import net.epicpunishments.punishment.application.PlayerTargetResolver;
 import net.epicpunishments.punishment.application.SessionPunishmentCache;
+import net.epicpunishments.punishment.application.TargetAuthorizationService;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -44,12 +53,15 @@ public final class PluginContainer implements AutoCloseable {
     private final BoundedTaskExecutor taskExecutor;
     private final ConfigurationService configurations;
     private final PaperMainThreadExecutor mainThreadExecutor;
+    private final Clock clock = Clock.systemUTC();
     private final AtomicBoolean stopping = new AtomicBoolean();
     private volatile PersistenceProvider persistenceProvider;
     private volatile PendingLoginAssessments pendingLogins;
     private volatile SessionPunishmentCache sessionPunishments;
     private volatile LoginAssessmentService loginAssessmentService;
     private volatile SuccessfulJoinService successfulJoinService;
+    private volatile PlayerPunishmentService playerPunishmentService;
+    private volatile PunishmentCommandRuntime punishmentCommandRuntime;
 
     private PluginContainer(
             EpicPunishments plugin,
@@ -92,6 +104,9 @@ public final class PluginContainer implements AutoCloseable {
                 configurations,
                 plugin.getPluginMeta().getVersion(),
                 dispatcher,
+                () -> Optional.ofNullable(punishmentCommandRuntime),
+                plugin.getServer(),
+                clock,
                 plugin.getLogger()
         ));
 
@@ -148,6 +163,11 @@ public final class PluginContainer implements AutoCloseable {
         if (joins != null) {
             joins.stop();
         }
+        PlayerPunishmentService playerPunishments = playerPunishmentService;
+        if (playerPunishments != null) {
+            playerPunishments.stop();
+        }
+        punishmentCommandRuntime = null;
         configurations.stop();
         mainThreadExecutor.close();
         plugin.getServer().getGlobalRegionScheduler().cancelTasks(plugin);
@@ -172,7 +192,6 @@ public final class PluginContainer implements AutoCloseable {
     }
 
     private void initializePlayerConnections(ConfigurationSnapshot snapshot, PersistenceProvider provider) {
-        Clock clock = Clock.systemUTC();
         var pending = new PendingLoginAssessments(MAXIMUM_PENDING_LOGINS, PENDING_LOGIN_TTL, clock);
         var sessions = new SessionPunishmentCache();
         var loginService = new LoginAssessmentService(
@@ -199,8 +218,32 @@ public final class PluginContainer implements AutoCloseable {
                 clock,
                 plugin.getLogger()
         );
+        var playerPunishments = new PlayerPunishmentService(
+                new PlayerTargetResolver(provider.playerIdentities(), new PlayerTargetParser()),
+                new PaperPlayerExemptionLookup(plugin, mainThreadExecutor),
+                new TargetAuthorizationService(() -> configurations.current()
+                        .map(current -> current.punishments().consoleBypassesExempt())
+                        .orElse(snapshot.punishments().consoleBypassesExempt())),
+                provider.punishments(),
+                provider.moderationMutations(),
+                sessions,
+                () -> configurations.current()
+                        .map(ConfigurationSnapshot::punishments)
+                        .orElse(snapshot.punishments()),
+                clock
+        );
+        var punishmentEnforcer = new PaperPunishmentEnforcer(
+                plugin,
+                mainThreadExecutor,
+                configurations,
+                joinService,
+                clock,
+                plugin.getLogger()
+        );
         loginAssessmentService = loginService;
         successfulJoinService = joinService;
+        playerPunishmentService = playerPunishments;
+        punishmentCommandRuntime = new PunishmentCommandRuntime(playerPunishments, punishmentEnforcer);
         pendingLogins = pending;
         sessionPunishments = sessions;
         plugin.getServer().getPluginManager().registerEvents(new PlayerConnectionListener(
@@ -210,6 +253,13 @@ public final class PluginContainer implements AutoCloseable {
                 configurations,
                 clock,
                 plugin.getLogger()
+        ), plugin);
+        plugin.getServer().getPluginManager().registerEvents(new PlayerMuteListener(
+                plugin,
+                sessions,
+                configurations,
+                mainThreadExecutor,
+                clock
         ), plugin);
         plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(
                 plugin,

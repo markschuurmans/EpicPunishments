@@ -5,6 +5,7 @@ import net.epicpunishments.common.domain.PageRequest;
 import net.epicpunishments.identity.domain.PlayerAddress;
 import net.epicpunishments.punishment.domain.Punishment;
 import net.epicpunishments.punishment.domain.PunishmentTarget;
+import net.epicpunishments.punishment.domain.PunishmentType;
 import net.epicpunishments.punishment.domain.SessionPunishments;
 
 import java.time.Instant;
@@ -19,7 +20,15 @@ public interface PunishmentRepository {
 
     CompletionStage<SessionPunishments> findActiveForAddress(PlayerAddress address, UUID affectedPlayerId, Instant at);
 
-    CompletionStage<Page<Punishment>> findHistory(PunishmentTarget target, PageRequest pageRequest);
+    default CompletionStage<Page<Punishment>> findHistory(PunishmentTarget target, PageRequest pageRequest) {
+        return findHistory(target, Optional.empty(), pageRequest);
+    }
+
+    CompletionStage<Page<Punishment>> findHistory(
+            PunishmentTarget target,
+            Optional<PunishmentType> type,
+            PageRequest pageRequest
+    );
 
     /**
      * Records a delivery once for a punishment/player pair.

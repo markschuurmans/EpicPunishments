@@ -143,10 +143,12 @@ public final class InMemoryModerationStore implements
     @Override
     public synchronized CompletionStage<Page<Punishment>> findHistory(
             PunishmentTarget target,
+            Optional<PunishmentType> type,
             PageRequest pageRequest
     ) {
         List<Punishment> matching = storedPunishments.values().stream()
                 .filter(punishment -> punishment.target().equals(target))
+                .filter(punishment -> type.map(value -> punishment.type() == value).orElse(true))
                 .sorted(Comparator.comparing(Punishment::createdAt).reversed()
                         .thenComparing(punishment -> punishment.id().toString()))
                 .toList();

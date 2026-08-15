@@ -72,4 +72,31 @@ class SessionPunishmentCacheTest {
 
         assertThat(cache.find(playerId, address).orElseThrow().undeliveredWarnings()).isEmpty();
     }
+
+    @Test
+    void appliesAndRevokesCommittedPlayerMutesForTheCurrentSession() {
+        UUID playerId = UUID.randomUUID();
+        PlayerAddress address = PlayerAddress.fromBytes(new byte[]{10, 0, 0, 1});
+        var cache = new SessionPunishmentCache();
+        cache.put(new LoginAssessment(playerId, address, NOW, SessionPunishments.empty()));
+        Punishment mute = new Punishment(
+                UUID.randomUUID(),
+                PunishmentType.MUTE,
+                new PlayerPunishmentTarget(playerId),
+                "Test mute",
+                Actor.console(),
+                NOW,
+                Optional.of(NOW.plusSeconds(10)),
+                Optional.empty()
+        );
+
+        cache.apply(mute);
+
+        assertThat(cache.activeMute(playerId, NOW.plusSeconds(9))).contains(mute);
+        assertThat(cache.activeMute(playerId, NOW.plusSeconds(10))).isEmpty();
+
+        cache.revoke(mute.id());
+
+        assertThat(cache.activeMute(playerId, NOW.plusSeconds(1))).isEmpty();
+    }
 }

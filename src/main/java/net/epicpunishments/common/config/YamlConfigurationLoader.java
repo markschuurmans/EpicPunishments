@@ -27,6 +27,11 @@ public final class YamlConfigurationLoader implements ConfigurationLoader {
     private static final Pattern ENVIRONMENT_VARIABLE = Pattern.compile("\\$\\{([A-Za-z_][A-Za-z0-9_]*)}");
     private static final Duration MINIMUM_QUERY_TIMEOUT = Duration.ofMillis(100);
     private static final Duration MAXIMUM_QUERY_TIMEOUT = Duration.ofSeconds(30);
+    private static final Duration DEFAULT_MAXIMUM_PUNISHMENT_DURATION = Duration.ofDays(365);
+    private static final Duration MAXIMUM_CONFIGURABLE_PUNISHMENT_DURATION = Duration.ofDays(3_650);
+    private static final int DEFAULT_MAXIMUM_REASON_LENGTH = 512;
+    private static final int DEFAULT_HISTORY_PAGE_SIZE = 10;
+    private static final boolean DEFAULT_CONSOLE_BYPASSES_EXEMPT = true;
 
     private final Path dataDirectory;
     private final ResourceProvider resources;
@@ -54,7 +59,25 @@ public final class YamlConfigurationLoader implements ConfigurationLoader {
 
         return new ConfigurationSnapshot(
                 readDatabaseConfiguration(configuration),
+                readPunishmentConfiguration(configuration),
                 readMessageCatalog(messages)
+        );
+    }
+
+    private PunishmentConfiguration readPunishmentConfiguration(Map<String, Object> root)
+            throws ConfigurationException {
+        java.util.Optional<String> configuredMaximum = optionalString(root, "punishments.maximum-duration");
+        Duration maximumDuration = configuredMaximum.isPresent()
+                ? parsePunishmentDuration(configuredMaximum.orElseThrow(), "punishments.maximum-duration")
+                : DEFAULT_MAXIMUM_PUNISHMENT_DURATION;
+        return new PunishmentConfiguration(
+                maximumDuration,
+                optionalInteger(root, "punishments.maximum-reason-length", 1, 1_024)
+                        .orElse(DEFAULT_MAXIMUM_REASON_LENGTH),
+                optionalInteger(root, "punishments.history-page-size", 1, 100)
+                        .orElse(DEFAULT_HISTORY_PAGE_SIZE),
+                optionalBoolean(root, "punishments.console-bypasses-exempt")
+                        .orElse(DEFAULT_CONSOLE_BYPASSES_EXEMPT)
         );
     }
 
@@ -224,6 +247,64 @@ public final class YamlConfigurationLoader implements ConfigurationLoader {
         return (int) longValue;
     }
 
+    private java.util.Optional<String> optionalString(Map<String, Object> root, String path)
+            throws ConfigurationException {
+        Object value = optionalValueAt(root, path);
+        if (value == null) {
+            return java.util.Optional.empty();
+        }
+        if (!(value instanceof String stringValue) || stringValue.isBlank()) {
+            throw new ConfigurationException(path + " must be a non-blank string.");
+        }
+        return java.util.Optional.of(interpolateEnvironment(stringValue, path));
+    }
+
+    private java.util.Optional<Integer> optionalInteger(
+            Map<String, Object> root,
+            String path,
+            int minimum,
+            int maximum
+    ) throws ConfigurationException {
+        Object value = optionalValueAt(root, path);
+        if (value == null) {
+            return java.util.Optional.empty();
+        }
+        if (!(value instanceof Number number)) {
+            throw new ConfigurationException(path + " must be an integer.");
+        }
+        long longValue = number.longValue();
+        if (number.doubleValue() != longValue || longValue < minimum || longValue > maximum) {
+            throw new ConfigurationException(path + " must be between " + minimum + " and " + maximum + '.');
+        }
+        return java.util.Optional.of((int) longValue);
+    }
+
+    private java.util.Optional<Boolean> optionalBoolean(Map<String, Object> root, String path)
+            throws ConfigurationException {
+        Object value = optionalValueAt(root, path);
+        if (value == null) {
+            return java.util.Optional.empty();
+        }
+        if (!(value instanceof Boolean booleanValue)) {
+            throw new ConfigurationException(path + " must be true or false.");
+        }
+        return java.util.Optional.of(booleanValue);
+    }
+
+    private Object optionalValueAt(Map<String, Object> root, String path) throws ConfigurationException {
+        Object current = root;
+        for (String segment : path.split("\\.")) {
+            if (!(current instanceof Map<?, ?> currentMap)) {
+                throw new ConfigurationException(path + " must be nested under YAML mappings.");
+            }
+            if (!currentMap.containsKey(segment)) {
+                return null;
+            }
+            current = currentMap.get(segment);
+        }
+        return current;
+    }
+
     private Object valueAt(Map<String, Object> root, String path) throws ConfigurationException {
         Object current = root;
         for (String segment : path.split("\\.")) {
@@ -255,6 +336,28 @@ public final class YamlConfigurationLoader implements ConfigurationLoader {
             return parsed;
         } catch (ArithmeticException | NumberFormatException exception) {
             throw new ConfigurationException("database.query-timeout is outside the supported range.", exception);
+        }
+    }
+
+    private Duration parsePunishmentDuration(String value, String path) throws ConfigurationException {
+        Matcher matcher = Pattern.compile("([1-9][0-9]*)(m|h|d)").matcher(value);
+        if (!matcher.matches()) {
+            throw new ConfigurationException(path + " must use m, h, or d (for example, 365d).");
+        }
+        try {
+            long amount = Long.parseLong(matcher.group(1));
+            Duration parsed = switch (matcher.group(2)) {
+                case "m" -> Duration.ofMinutes(amount);
+                case "h" -> Duration.ofHours(amount);
+                case "d" -> Duration.ofDays(amount);
+                default -> throw new IllegalStateException("Unexpected duration unit.");
+            };
+            if (parsed.compareTo(MAXIMUM_CONFIGURABLE_PUNISHMENT_DURATION) > 0) {
+                throw new ConfigurationException(path + " must not exceed 3650d.");
+            }
+            return parsed;
+        } catch (ArithmeticException | NumberFormatException exception) {
+            throw new ConfigurationException(path + " is outside the supported range.", exception);
         }
     }
 
