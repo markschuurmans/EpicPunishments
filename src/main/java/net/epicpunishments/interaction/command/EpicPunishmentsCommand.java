@@ -4,9 +4,11 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import net.epicpunishments.common.config.ConfigurationService;
+import net.epicpunishments.common.observability.PluginStatusService;
 import net.epicpunishments.interaction.command.subcommand.ReloadCommand;
 import net.epicpunishments.interaction.command.subcommand.PunishCommand;
 import net.epicpunishments.interaction.command.subcommand.VersionCommand;
+import net.epicpunishments.interaction.command.subcommand.StatusCommand;
 import net.epicpunishments.interaction.command.subcommand.ReportCommand;
 import net.epicpunishments.interaction.command.subcommand.ReportsCommand;
 import net.kyori.adventure.text.Component;
@@ -28,6 +30,7 @@ public final class EpicPunishmentsCommand implements EpicCommand {
     public EpicPunishmentsCommand(
             ConfigurationService configurations,
             String version,
+            PluginStatusService statuses,
             PaperMessageDispatcher messageDispatcher,
             Supplier<Optional<PunishmentCommandRuntime>> punishmentRuntime,
             Supplier<Optional<ReportCommandRuntime>> reportRuntime,
@@ -40,6 +43,7 @@ public final class EpicPunishmentsCommand implements EpicCommand {
                 configurations, messageDispatcher, punishmentRuntime, server, clock, logger);
         this.subcommands = List.of(
                 new VersionCommand(configurations, version),
+                new StatusCommand(configurations, statuses, messageDispatcher),
                 new ReloadCommand(configurations, messageDispatcher, logger),
                 punishCommand,
                 new ReportCommand(configurations, messageDispatcher, reportRuntime, logger),

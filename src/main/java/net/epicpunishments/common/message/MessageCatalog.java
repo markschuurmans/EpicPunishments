@@ -12,6 +12,7 @@ public final class MessageCatalog {
     public static final Set<String> REQUIRED_KEYS = Set.of(
             "command.usage",
             "command.version",
+            "command.status",
             "command.reload-started",
             "command.reload-success",
             "command.reload-failed",

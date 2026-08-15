@@ -9,14 +9,8 @@ import net.epicpunishments.report.port.ReportRepository;
 
 import java.util.concurrent.CompletionStage;
 
-public interface PersistenceProvider {
+public interface PersistenceProvider extends PersistenceStatus {
     CompletionStage<Void> initialize();
-
-    String providerName();
-
-    CompletionStage<PersistenceHealth> health();
-
-    CompletionStage<String> schemaVersion();
 
     PlayerIdentityRepository playerIdentities();
 

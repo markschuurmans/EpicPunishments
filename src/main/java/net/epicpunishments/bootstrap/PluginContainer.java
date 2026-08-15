@@ -10,6 +10,7 @@ import net.epicpunishments.common.persistence.PersistenceException;
 import net.epicpunishments.common.persistence.PersistenceFailureKind;
 import net.epicpunishments.common.persistence.PersistenceHealth;
 import net.epicpunishments.common.persistence.PersistenceProvider;
+import net.epicpunishments.common.observability.PluginStatusService;
 import net.epicpunishments.infrastructure.persistence.PersistenceProviderFactory;
 import net.epicpunishments.identity.application.LoginAssessmentService;
 import net.epicpunishments.identity.application.PendingLoginAssessments;
@@ -59,6 +60,7 @@ public final class PluginContainer implements AutoCloseable {
     private final BoundedTaskExecutor taskExecutor;
     private final ConfigurationService configurations;
     private final PaperMainThreadExecutor mainThreadExecutor;
+    private final PluginStatusService statuses;
     private final Clock clock = Clock.systemUTC();
     private final AtomicBoolean stopping = new AtomicBoolean();
     private volatile PersistenceProvider persistenceProvider;
@@ -82,6 +84,10 @@ public final class PluginContainer implements AutoCloseable {
         this.taskExecutor = Objects.requireNonNull(taskExecutor, "taskExecutor");
         this.configurations = Objects.requireNonNull(configurations, "configurations");
         this.mainThreadExecutor = Objects.requireNonNull(mainThreadExecutor, "mainThreadExecutor");
+        this.statuses = new PluginStatusService(
+                () -> Optional.ofNullable(persistenceProvider),
+                taskExecutor::pendingTaskCount
+        );
     }
 
     public static PluginContainer create(EpicPunishments plugin) {
@@ -112,6 +118,7 @@ public final class PluginContainer implements AutoCloseable {
         CommandManager.register(plugin, plugin.getLogger(), new EpicPunishmentsCommand(
                 configurations,
                 plugin.getPluginMeta().getVersion(),
+                statuses,
                 dispatcher,
                 () -> Optional.ofNullable(punishmentCommandRuntime),
                 () -> Optional.ofNullable(reportCommandRuntime),
@@ -122,7 +129,7 @@ public final class PluginContainer implements AutoCloseable {
 
         configurations.start().thenCompose(snapshot -> {
             if (stopping.get()) {
-                return CompletableFuture.<ConfigurationSnapshot>failedFuture(
+                return CompletableFuture.<InitializedPlugin>failedFuture(
                         new IllegalStateException("Plugin is stopping.")
                 );
             }
@@ -131,12 +138,13 @@ public final class PluginContainer implements AutoCloseable {
             return provider.initialize()
                     .thenCompose(ignored -> provider.health())
                     .thenCompose(health -> health == PersistenceHealth.HEALTHY
-                            ? CompletableFuture.completedFuture(snapshot)
+                            ? provider.schemaVersion()
+                                    .thenApply(schemaVersion -> new InitializedPlugin(snapshot, schemaVersion))
                             : CompletableFuture.failedFuture(new PersistenceException(
                                     PersistenceFailureKind.UNAVAILABLE,
                                     "Persistence health check reported " + health.name().toLowerCase(Locale.ROOT)
                             )));
-        }).whenComplete((snapshot, failure) -> {
+        }).whenComplete((initialized, failure) -> {
             if (stopping.get()) {
                 return;
             }
@@ -151,10 +159,9 @@ public final class PluginContainer implements AutoCloseable {
                     return;
                 }
                 PersistenceProvider provider = persistenceProvider;
-                String schemaVersion = provider.schemaVersion().toCompletableFuture().join();
-                initializePlayerConnections(snapshot, provider);
+                initializePlayerConnections(initialized.configuration(), provider);
                 plugin.getLogger().info("Configuration, messages, and database schema loaded; provider: "
-                        + provider.providerName() + ", schema version: " + schemaVersion + '.');
+                        + provider.providerName() + ", schema version: " + initialized.schemaVersion() + '.');
             });
         });
     }
@@ -345,5 +352,8 @@ public final class PluginContainer implements AutoCloseable {
             return cause.getMessage();
         }
         return "Unexpected " + cause.getClass().getSimpleName() + '.';
+    }
+
+    private record InitializedPlugin(ConfigurationSnapshot configuration, String schemaVersion) {
     }
 }

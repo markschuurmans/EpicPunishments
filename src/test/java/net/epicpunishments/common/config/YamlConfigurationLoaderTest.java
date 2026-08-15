@@ -201,6 +201,7 @@ class YamlConfigurationLoaderTest {
                 command:
                   usage: "<gold>Usage</gold>"
                   version: "<gold>EpicPunishments {version}</gold>"
+                  status: "<gold>{provider} {schema} {health} {pending-tasks}</gold>"
                   reload-started: "<yellow>Reloading</yellow>"
                   reload-success: "<green>Reloaded</green>"
                   reload-failed: "<red>Failed</red>"

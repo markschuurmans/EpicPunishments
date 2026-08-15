@@ -21,6 +21,7 @@ class PluginMetadataTest {
                     .contains("main: net.epicpunishments.bootstrap.EpicPunishments")
                     .contains("api-version: '26.2'")
                     .contains("epicpunishments.command.reload:")
+                    .contains("epicpunishments.command.status:")
                     .contains("epicpunishments.punishment.ban:")
                     .contains("epicpunishments.punishment.ban.ip:")
                     .contains("epicpunishments.punishment.unban:")

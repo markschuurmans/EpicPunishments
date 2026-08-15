@@ -1,5 +1,6 @@
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.tasks.bundling.AbstractArchiveTask
+import java.util.zip.ZipFile
 
 plugins {
     id("java-library")
@@ -49,6 +50,7 @@ tasks {
         // Your plugin's jar (or shadowJar if present) will be used automatically.
         minecraftVersion("26.2")
         jvmArgs("-Xms2G", "-Xmx2G")
+        standardInput = System.`in`
     }
 
     processResources {
@@ -83,8 +85,46 @@ tasks {
         relocate("org.yaml.snakeyaml", "net.epicpunishments.lib.snakeyaml")
     }
 
+    val verifyReleaseArtifact by registering {
+        group = "verification"
+        description = "Verifies that the distributable plugin JAR contains its runtime dependencies and resources."
+        dependsOn(shadowJar)
+        val releaseJar = shadowJar.flatMap { it.archiveFile }
+        inputs.file(releaseJar)
+
+        doLast {
+            val requiredEntries = setOf(
+                "plugin.yml",
+                "config.yml",
+                "messages.yml",
+                "net/epicpunishments/bootstrap/EpicPunishments.class",
+                "db/migration/sqlite/V1__initial_schema.sql",
+                "com/zaxxer/hikari/HikariDataSource.class",
+                "org/sqlite/JDBC.class",
+                "com/mysql/cj/jdbc/Driver.class",
+                "org/postgresql/Driver.class",
+                "org/flywaydb/core/Flyway.class",
+                "net/epicpunishments/lib/snakeyaml/Yaml.class"
+            )
+            ZipFile(releaseJar.get().asFile).use { archive ->
+                val entries = archive.entries().asSequence().map { it.name }.toSet()
+                val missing = requiredEntries - entries
+                check(missing.isEmpty()) {
+                    "Release JAR is missing required entries: ${missing.sorted().joinToString()}"
+                }
+                check("org/yaml/snakeyaml/Yaml.class" !in entries) {
+                    "Release JAR contains the unrelocated SnakeYAML implementation"
+                }
+            }
+        }
+    }
+
     assemble {
         dependsOn(shadowJar)
+    }
+
+    check {
+        dependsOn(verifyReleaseArtifact)
     }
 
     withType<AbstractArchiveTask>().configureEach {
