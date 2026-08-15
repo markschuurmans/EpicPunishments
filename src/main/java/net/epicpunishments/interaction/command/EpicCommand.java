@@ -27,6 +27,10 @@ public interface EpicCommand {
         return List.of();
     }
 
+    default Collection<ConvenienceCommand> convenienceCommands() {
+        return List.of();
+    }
+
     default LiteralArgumentBuilder<CommandSourceStack> create() {
         var command = Commands.literal(name())
                 .requires(source -> source.getSender().hasPermission(permission()))

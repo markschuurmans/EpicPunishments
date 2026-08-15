@@ -173,7 +173,7 @@ class PlayerPunishmentServiceTest {
                 store,
                 store,
                 sessions,
-                () -> new PunishmentConfiguration(Duration.ofDays(30), 100, 10, false),
+                () -> new PunishmentConfiguration(Duration.ofDays(30), 100, 10, false, java.util.Set.of()),
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
     }

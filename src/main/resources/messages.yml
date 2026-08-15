@@ -35,6 +35,7 @@ punishment:
   unsupported-sender: '<red>This command can be used only by a player or the console.</red>'
   muted: '<red>You have been muted: {reason}</red>'
   mute-blocked: '<red>You cannot chat while muted: {reason}</red>'
+  staff-notification: '<gold>{actor} {action} {type} punishment {id} for {target}: {reason}</gold>'
 
 report:
   usage: '<gold>Use <yellow>/epicpunishments report <create|status|list></yellow>.</gold>'

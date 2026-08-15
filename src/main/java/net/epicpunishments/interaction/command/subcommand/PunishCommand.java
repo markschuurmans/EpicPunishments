@@ -7,10 +7,12 @@ import com.mojang.brigadier.context.CommandContext;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import net.epicpunishments.common.config.ConfigurationService;
+import net.epicpunishments.common.config.PunishmentCommandAlias;
 import net.epicpunishments.common.domain.Actor;
 import net.epicpunishments.common.domain.Page;
 import net.epicpunishments.common.domain.PageRequest;
 import net.epicpunishments.interaction.command.CommandRecipient;
+import net.epicpunishments.interaction.command.ConvenienceCommand;
 import net.epicpunishments.interaction.command.EpicCommand;
 import net.epicpunishments.interaction.command.PaperMessageDispatcher;
 import net.epicpunishments.interaction.command.PunishmentCommandRuntime;
@@ -32,6 +34,8 @@ import org.bukkit.entity.Player;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -96,6 +100,45 @@ public final class PunishCommand implements EpicCommand {
                 .then(historyBranch("warnings", Optional.of(PunishmentType.WARNING),
                         "epicpunishments.punishment.warnings"))
                 .then(historyBranch("history", Optional.empty(), "epicpunishments.punishment.history"));
+    }
+
+    public Collection<ConvenienceCommand> convenienceCommands() {
+        return List.of(
+                new ConvenienceCommand("ban", "Ban a player or IP address",
+                        () -> convenienceCreate("ban", PunishmentType.BAN,
+                                "epicpunishments.punishment.ban", PunishmentCommandAlias.BAN)),
+                new ConvenienceCommand("mute", "Mute a player or IP address",
+                        () -> convenienceCreate("mute", PunishmentType.MUTE,
+                                "epicpunishments.punishment.mute", PunishmentCommandAlias.MUTE)),
+                new ConvenienceCommand("warn", "Warn a player or IP address",
+                        () -> convenienceWarning(PunishmentCommandAlias.WARN))
+        );
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> convenienceCreate(
+            String name,
+            PunishmentType type,
+            String permission,
+            PunishmentCommandAlias alias
+    ) {
+        return Commands.literal(name)
+                .requires(source -> aliasEnabled(alias)
+                        && source.getSender().hasPermission(permission))
+                .executes(this::execute)
+                .then(commandArguments().executes(context -> create(context, type)));
+    }
+
+    private LiteralArgumentBuilder<CommandSourceStack> convenienceWarning(PunishmentCommandAlias alias) {
+        return Commands.literal(alias.label())
+                .requires(source -> aliasEnabled(alias)
+                        && source.getSender().hasPermission("epicpunishments.punishment.warn"))
+                .executes(this::execute)
+                .then(commandArguments().executes(this::createWarning));
+    }
+
+    private boolean aliasEnabled(PunishmentCommandAlias alias) {
+        return configurations.current().map(snapshot -> snapshot.punishments().commandAliases().contains(alias))
+                .orElse(false);
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> createBranch(
@@ -229,6 +272,9 @@ public final class PunishCommand implements EpicCommand {
                     logger.info("Created player " + committed.type().name().toLowerCase(Locale.ROOT)
                             + " punishment " + committed.id() + '.');
                     available.orElseThrow().enforcer().apply(committed);
+                    String playerName = result.identity().orElseThrow().currentName();
+                    available.orElseThrow().notifications().notifyCommitted(
+                            committed, playerName, playerName);
                 }
             });
             return Command.SINGLE_SUCCESS;
@@ -266,8 +312,20 @@ public final class PunishCommand implements EpicCommand {
                 available.orElseThrow().addressService().revoke(new PlayerRevocationRequest(
                         arguments.target(), type, arguments.remainder().isEmpty() ? "-" : arguments.remainder(),
                         invocation.actor())).whenComplete((result, failure) -> {
-                    if (failure != null) failed(invocation.recipient(), failure);
-                    else renderAddressResult(invocation.recipient(), result, true);
+                    if (failure != null) {
+                        failed(invocation.recipient(), failure);
+                    } else {
+                        renderAddressResult(invocation.recipient(), result, true);
+                        if (result.status() == AddressModerationResult.Status.APPLIED) {
+                            result.punishments().forEach(punishment -> {
+                                logger.info("Revoked IP " + punishment.type().name().toLowerCase(Locale.ROOT)
+                                        + " punishment " + punishment.id() + " for "
+                                        + result.address().redacted() + '.');
+                                available.orElseThrow().notifications().notifyCommitted(
+                                        punishment, result.address().fullAddress(), result.address().redacted());
+                            });
+                        }
+                    }
                 });
                 return Command.SINGLE_SUCCESS;
             } catch (IllegalArgumentException exception) {
@@ -288,10 +346,13 @@ public final class PunishCommand implements EpicCommand {
                 } else {
                     renderModerationResult(invocation.recipient(), result, true);
                     if (result.status() == PlayerModerationResult.Status.APPLIED) {
-                        result.punishments().forEach(punishment -> logger.info(
-                                "Revoked player " + punishment.type().name().toLowerCase(Locale.ROOT)
-                                        + " punishment " + punishment.id() + '.'
-                        ));
+                        String playerName = result.identity().orElseThrow().currentName();
+                        result.punishments().forEach(punishment -> {
+                            logger.info("Revoked player " + punishment.type().name().toLowerCase(Locale.ROOT)
+                                    + " punishment " + punishment.id() + '.');
+                            available.orElseThrow().notifications().notifyCommitted(
+                                    punishment, playerName, playerName);
+                        });
                     }
                 }
             });
@@ -450,6 +511,8 @@ public final class PunishCommand implements EpicCommand {
             logger.info("Created IP " + committed.type().name().toLowerCase(Locale.ROOT)
                     + " punishment " + committed.id() + " for " + result.address().redacted() + '.');
             runtime.enforcer().apply(committed);
+            runtime.notifications().notifyCommitted(
+                    committed, result.address().fullAddress(), result.address().redacted());
         }
     }
 

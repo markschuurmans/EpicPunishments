@@ -36,6 +36,7 @@ public final class MessageCatalog {
             "punishment.unsupported-sender",
             "punishment.muted",
             "punishment.mute-blocked",
+            "punishment.staff-notification",
             "report.usage",
             "reports.usage",
             "report.invalid-input",

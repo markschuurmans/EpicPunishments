@@ -27,6 +27,9 @@ class BundledConfigurationTest {
 
         assertThat(snapshot.database().type()).isEqualTo(DatabaseType.SQLITE);
         assertThat(snapshot.reports().cooldown()).isEqualTo(java.time.Duration.ofMinutes(5));
+        assertThat(snapshot.punishments().commandAliases()).containsExactlyInAnyOrder(
+                PunishmentCommandAlias.BAN, PunishmentCommandAlias.MUTE, PunishmentCommandAlias.WARN
+        );
         assertThat(PlainTextComponentSerializer.plainText().serialize(
                 snapshot.messages().message("command.usage")
         )).isEqualTo("Use /epicpunishments <subcommand>.");

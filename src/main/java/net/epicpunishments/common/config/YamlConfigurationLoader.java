@@ -14,9 +14,11 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -32,6 +34,8 @@ public final class YamlConfigurationLoader implements ConfigurationLoader {
     private static final int DEFAULT_MAXIMUM_REASON_LENGTH = 512;
     private static final int DEFAULT_HISTORY_PAGE_SIZE = 10;
     private static final boolean DEFAULT_CONSOLE_BYPASSES_EXEMPT = true;
+    private static final Set<PunishmentCommandAlias> DEFAULT_PUNISHMENT_COMMAND_ALIASES =
+            Set.of(PunishmentCommandAlias.BAN, PunishmentCommandAlias.MUTE, PunishmentCommandAlias.WARN);
     private static final Duration DEFAULT_REPORT_COOLDOWN = Duration.ofMinutes(5);
     private static final int DEFAULT_MAXIMUM_REPORT_REASON_LENGTH = 512;
     private static final int DEFAULT_MAXIMUM_REPORT_RESPONSE_LENGTH = 1_024;
@@ -127,8 +131,36 @@ public final class YamlConfigurationLoader implements ConfigurationLoader {
                 optionalInteger(root, "punishments.history-page-size", 1, 100)
                         .orElse(DEFAULT_HISTORY_PAGE_SIZE),
                 optionalBoolean(root, "punishments.console-bypasses-exempt")
-                        .orElse(DEFAULT_CONSOLE_BYPASSES_EXEMPT)
+                        .orElse(DEFAULT_CONSOLE_BYPASSES_EXEMPT),
+                readPunishmentCommandAliases(root)
         );
+    }
+
+    private Set<PunishmentCommandAlias> readPunishmentCommandAliases(Map<String, Object> root)
+            throws ConfigurationException {
+        Object value = optionalValueAt(root, "punishments.command-aliases");
+        if (value == null) {
+            return DEFAULT_PUNISHMENT_COMMAND_ALIASES;
+        }
+        if (!(value instanceof java.util.List<?> values)) {
+            throw new ConfigurationException("punishments.command-aliases must be a YAML list.");
+        }
+        var aliases = EnumSet.noneOf(PunishmentCommandAlias.class);
+        for (Object entry : values) {
+            if (!(entry instanceof String stringValue) || stringValue.isBlank()) {
+                throw new ConfigurationException("punishments.command-aliases entries must be non-blank strings.");
+            }
+            try {
+                if (!aliases.add(PunishmentCommandAlias.parse(stringValue))) {
+                    throw new ConfigurationException(
+                            "punishments.command-aliases contains duplicate alias " + stringValue + '.'
+                    );
+                }
+            } catch (IllegalArgumentException exception) {
+                throw new ConfigurationException(exception.getMessage(), exception);
+            }
+        }
+        return Set.copyOf(aliases);
     }
 
     private void ensureDefaultFile(String name) throws ConfigurationException {

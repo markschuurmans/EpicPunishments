@@ -30,13 +30,39 @@ class YamlConfigurationLoaderTest {
         assertThat(snapshot.database().queryTimeout()).isEqualTo(Duration.ofSeconds(3));
         assertThat(snapshot.database().loginFailurePolicy()).isEqualTo(LoginFailurePolicy.DENY);
         assertThat(snapshot.punishments()).isEqualTo(new PunishmentConfiguration(
-                Duration.ofDays(365), 512, 10, true
+                Duration.ofDays(365), 512, 10, true,
+                java.util.Set.of(PunishmentCommandAlias.BAN, PunishmentCommandAlias.MUTE, PunishmentCommandAlias.WARN)
         ));
         assertThat(snapshot.reports()).isEqualTo(new ReportConfiguration(
                 Duration.ofMinutes(5), 512, 1_024, 10
         ));
         assertThat(snapshot.database().connection())
                 .isEqualTo(new SqliteConnectionConfiguration(temporaryDirectory.resolve("epicpunishments.db")));
+    }
+
+    @Test
+    void validatesConfigurablePunishmentConvenienceAliases() throws Exception {
+        String configured = sqliteConfig("3s") + """
+
+                punishments:
+                  command-aliases: [ban, warn]
+                """;
+        ConfigurationSnapshot snapshot = loaderAt(
+                temporaryDirectory.resolve("aliases"), configured, messages(), Map.of()
+        ).load();
+
+        assertThat(snapshot.punishments().commandAliases()).containsExactlyInAnyOrder(
+                PunishmentCommandAlias.BAN, PunishmentCommandAlias.WARN
+        );
+
+        String invalid = sqliteConfig("3s") + """
+
+                punishments:
+                  command-aliases: [kick]
+                """;
+        assertThatThrownBy(() -> loaderAt(
+                temporaryDirectory.resolve("invalid-alias"), invalid, messages(), Map.of()
+        ).load()).isInstanceOf(ConfigurationException.class).hasMessageContaining("ban, mute, or warn");
     }
 
     @Test
@@ -202,6 +228,7 @@ class YamlConfigurationLoaderTest {
                   unsupported-sender: "<red>Unsupported</red>"
                   muted: "<red>{reason}</red>"
                   mute-blocked: "<red>{reason}</red>"
+                  staff-notification: "<gold>{actor} {action} {type} {id} {target} {reason}</gold>"
                 report:
                   usage: "<gold>Usage</gold>"
                   invalid-input: "<red>{error}</red>"

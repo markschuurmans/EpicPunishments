@@ -24,6 +24,7 @@ import net.epicpunishments.interaction.command.ReportCommandRuntime;
 import net.epicpunishments.interaction.listener.PaperReportNotifications;
 import net.epicpunishments.interaction.listener.PaperPlayerNotifications;
 import net.epicpunishments.interaction.listener.PaperPunishmentEnforcer;
+import net.epicpunishments.interaction.listener.PaperPunishmentNotifications;
 import net.epicpunishments.interaction.listener.PlayerConnectionListener;
 import net.epicpunishments.interaction.listener.PlayerMuteListener;
 import net.epicpunishments.punishment.application.AddressPunishmentService;
@@ -108,7 +109,7 @@ public final class PluginContainer implements AutoCloseable {
 
     public void enable() {
         var dispatcher = new PaperMessageDispatcher(plugin.getServer(), mainThreadExecutor);
-        CommandManager.register(plugin, new EpicPunishmentsCommand(
+        CommandManager.register(plugin, plugin.getLogger(), new EpicPunishmentsCommand(
                 configurations,
                 plugin.getPluginMeta().getVersion(),
                 dispatcher,
@@ -259,6 +260,9 @@ public final class PluginContainer implements AutoCloseable {
                 clock,
                 plugin.getLogger()
         );
+        var punishmentNotifications = new PaperPunishmentNotifications(
+                plugin, mainThreadExecutor, configurations
+        );
         var reports = new ReportService(
                 provider.playerIdentities(),
                 provider.reports(),
@@ -279,7 +283,8 @@ public final class PluginContainer implements AutoCloseable {
         punishmentCommandRuntime = new PunishmentCommandRuntime(
                 playerPunishments,
                 addressPunishments,
-                punishmentEnforcer
+                punishmentEnforcer,
+                punishmentNotifications
         );
         reportService = reports;
         reportCommandRuntime = new ReportCommandRuntime(reports, reportNotifications);

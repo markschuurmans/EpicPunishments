@@ -27,6 +27,7 @@ punishments:
   maximum-reason-length: 512
   history-page-size: 10
   console-bypasses-exempt: true
+  command-aliases: [ban, mute, warn]
 
 reports:
   cooldown: 5m

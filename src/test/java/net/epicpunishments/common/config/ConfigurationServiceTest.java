@@ -76,7 +76,9 @@ class ConfigurationServiceTest {
                         LoginFailurePolicy.DENY,
                         new SqliteConnectionConfiguration(Path.of("database.db"))
                 ),
-                new PunishmentConfiguration(Duration.ofDays(365), 512, 10, true),
+                new PunishmentConfiguration(Duration.ofDays(365), 512, 10, true,
+                        java.util.Set.of(PunishmentCommandAlias.BAN, PunishmentCommandAlias.MUTE,
+                                PunishmentCommandAlias.WARN)),
                 new ReportConfiguration(Duration.ofMinutes(5), 512, 1_024, 10),
                 MessageCatalog.parse(messages)
         );

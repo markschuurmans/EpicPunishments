@@ -23,6 +23,7 @@ import org.bukkit.Server;
 public final class EpicPunishmentsCommand implements EpicCommand {
     private final ConfigurationService configurations;
     private final Collection<EpicCommand> subcommands;
+    private final PunishCommand punishCommand;
 
     public EpicPunishmentsCommand(
             ConfigurationService configurations,
@@ -35,10 +36,12 @@ public final class EpicPunishmentsCommand implements EpicCommand {
             Logger logger
     ) {
         this.configurations = configurations;
+        this.punishCommand = new PunishCommand(
+                configurations, messageDispatcher, punishmentRuntime, server, clock, logger);
         this.subcommands = List.of(
                 new VersionCommand(configurations, version),
                 new ReloadCommand(configurations, messageDispatcher, logger),
-                new PunishCommand(configurations, messageDispatcher, punishmentRuntime, server, clock, logger),
+                punishCommand,
                 new ReportCommand(configurations, messageDispatcher, reportRuntime, logger),
                 new ReportsCommand(configurations, messageDispatcher, reportRuntime, logger)
         );
@@ -62,6 +65,11 @@ public final class EpicPunishmentsCommand implements EpicCommand {
     @Override
     public Collection<EpicCommand> subcommands() {
         return subcommands;
+    }
+
+    @Override
+    public Collection<ConvenienceCommand> convenienceCommands() {
+        return punishCommand.convenienceCommands();
     }
 
     @Override
