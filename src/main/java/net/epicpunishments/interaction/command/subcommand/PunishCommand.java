@@ -16,6 +16,7 @@ import net.epicpunishments.interaction.command.PaperMessageDispatcher;
 import net.epicpunishments.interaction.command.PunishmentCommandRuntime;
 import net.epicpunishments.interaction.command.PunishmentCommandArguments;
 import net.epicpunishments.punishment.application.CreatePunishmentInput;
+import net.epicpunishments.punishment.application.AddressModerationResult;
 import net.epicpunishments.punishment.application.PlayerHistoryResult;
 import net.epicpunishments.punishment.application.PlayerModerationRequest;
 import net.epicpunishments.punishment.application.PlayerModerationResult;
@@ -191,6 +192,24 @@ public final class PunishCommand implements EpicCommand {
             send(context, "command.not-ready");
             return 0;
         }
+        if (isIp(target)) {
+            String permission = ipPermission(type);
+            if (!context.getSource().getSender().hasPermission(permission)) {
+                dispatcher.send(invocation.recipient(), message("punishment.ip-permission-required"));
+                return 0;
+            }
+            try {
+                available.orElseThrow().addressService().create(new PlayerModerationRequest(target, type,
+                        input.reason(), input.duration(), invocation.actor(), false))
+                        .whenComplete((result, failure) -> completeAddressCreate(
+                                invocation.recipient(), available.orElseThrow(), result, failure));
+                return Command.SINGLE_SUCCESS;
+            } catch (IllegalArgumentException exception) {
+                dispatcher.send(invocation.recipient(), message("punishment.invalid-input", Map.of(
+                        "error", exception.getMessage())));
+                return 0;
+            }
+        }
         try {
             available.orElseThrow().service().create(new PlayerModerationRequest(
                     target,
@@ -238,6 +257,25 @@ public final class PunishCommand implements EpicCommand {
             send(context, "command.not-ready");
             return 0;
         }
+        if (isIp(arguments.target())) {
+            if (!context.getSource().getSender().hasPermission(ipPermission(type))) {
+                dispatcher.send(invocation.recipient(), message("punishment.ip-permission-required"));
+                return 0;
+            }
+            try {
+                available.orElseThrow().addressService().revoke(new PlayerRevocationRequest(
+                        arguments.target(), type, arguments.remainder().isEmpty() ? "-" : arguments.remainder(),
+                        invocation.actor())).whenComplete((result, failure) -> {
+                    if (failure != null) failed(invocation.recipient(), failure);
+                    else renderAddressResult(invocation.recipient(), result, true);
+                });
+                return Command.SINGLE_SUCCESS;
+            } catch (IllegalArgumentException exception) {
+                dispatcher.send(invocation.recipient(), message("punishment.invalid-input", Map.of(
+                        "error", exception.getMessage())));
+                return 0;
+            }
+        }
         try {
             available.orElseThrow().service().revoke(new PlayerRevocationRequest(
                     arguments.target(),
@@ -283,6 +321,27 @@ public final class PunishCommand implements EpicCommand {
         if (available.isEmpty() || policy == null) {
             send(context, "command.not-ready");
             return 0;
+        }
+        if (isIp(arguments.target())) {
+            if (!context.getSource().getSender().hasPermission("epicpunishments.punishment.history.ip")) {
+                dispatcher.send(invocation.recipient(), message("punishment.ip-permission-required"));
+                return 0;
+            }
+            try {
+                String address = new net.epicpunishments.punishment.application.AddressTargetParser()
+                        .parse(arguments.target()).fullAddress();
+                available.orElseThrow().addressService().history(arguments.target(), type,
+                        new PageRequest(arguments.page() - 1, policy.historyPageSize()))
+                        .whenComplete((page, failure) -> {
+                            if (failure != null) failed(invocation.recipient(), failure);
+                            else renderAddressHistory(invocation.recipient(), address, page);
+                        });
+                return Command.SINGLE_SUCCESS;
+            } catch (IllegalArgumentException exception) {
+                dispatcher.send(invocation.recipient(), message("punishment.invalid-input", Map.of(
+                        "error", exception.getMessage())));
+                return 0;
+            }
         }
         available.orElseThrow().service().history(
                 arguments.target(),
@@ -377,6 +436,62 @@ public final class PunishCommand implements EpicCommand {
         }
         logger.warning("A player moderation command failed with " + cause.getClass().getSimpleName() + '.');
         dispatcher.send(recipient, message("punishment.command-failed"));
+    }
+
+    private void completeAddressCreate(CommandRecipient recipient, PunishmentCommandRuntime runtime,
+            AddressModerationResult result, Throwable failure) {
+        if (failure != null) {
+            failed(recipient, failure);
+            return;
+        }
+        renderAddressResult(recipient, result, false);
+        if (result.status() == AddressModerationResult.Status.APPLIED) {
+            Punishment committed = result.punishments().getFirst();
+            logger.info("Created IP " + committed.type().name().toLowerCase(Locale.ROOT)
+                    + " punishment " + committed.id() + " for " + result.address().redacted() + '.');
+            runtime.enforcer().apply(committed);
+        }
+    }
+
+    private void renderAddressResult(CommandRecipient recipient, AddressModerationResult result, boolean revocation) {
+        if (result.status() == AddressModerationResult.Status.NO_ACTIVE_PUNISHMENT) {
+            dispatcher.send(recipient, message("punishment.no-active"));
+            return;
+        }
+        dispatcher.send(recipient, message(revocation ? "punishment.ip-revoked" : "punishment.ip-applied", Map.of(
+                "count", Integer.toString(result.punishments().size()),
+                "address", result.address().fullAddress(),
+                "type", result.punishments().getFirst().type().name().toLowerCase(Locale.ROOT))));
+    }
+
+    private void renderAddressHistory(CommandRecipient recipient, String address, Page<Punishment> history) {
+        if (history.items().isEmpty()) {
+            dispatcher.send(recipient, message("punishment.history-empty"));
+            return;
+        }
+        long pages = Math.max(1L, (history.totalItems() + history.size() - 1L) / history.size());
+        dispatcher.send(recipient, message("punishment.ip-history-header", Map.of("address", address,
+                "page", Integer.toString(history.page() + 1), "pages", Long.toString(pages))));
+        Instant now = clock.instant();
+        for (Punishment punishment : history.items()) {
+            String status = punishment.revocation().isPresent() ? "revoked"
+                    : punishment.isActiveAt(now) ? "active" : "expired";
+            dispatcher.send(recipient, message("punishment.history-entry", Map.of(
+                    "id", punishment.id().toString(), "type", punishment.type().name().toLowerCase(Locale.ROOT),
+                    "created", punishment.createdAt().toString(), "status", status, "reason", punishment.reason())));
+        }
+    }
+
+    private static boolean isIp(String target) {
+        return target.regionMatches(true, 0, "ip:", 0, 3);
+    }
+
+    private static String ipPermission(PunishmentType type) {
+        return switch (type) {
+            case BAN -> "epicpunishments.punishment.ban.ip";
+            case MUTE -> "epicpunishments.punishment.mute.ip";
+            case WARNING -> "epicpunishments.punishment.warn.ip";
+        };
     }
 
     private void send(CommandContext<CommandSourceStack> context, String key) {

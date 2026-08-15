@@ -4,6 +4,7 @@ import net.epicpunishments.common.domain.Actor;
 import net.epicpunishments.identity.domain.LoginAssessment;
 import net.epicpunishments.identity.domain.PlayerAddress;
 import net.epicpunishments.punishment.domain.PlayerPunishmentTarget;
+import net.epicpunishments.punishment.domain.AddressPunishmentTarget;
 import net.epicpunishments.punishment.domain.Punishment;
 import net.epicpunishments.punishment.domain.PunishmentType;
 import net.epicpunishments.punishment.domain.SessionPunishments;
@@ -98,5 +99,26 @@ class SessionPunishmentCacheTest {
         cache.revoke(mute.id());
 
         assertThat(cache.activeMute(playerId, NOW.plusSeconds(1))).isEmpty();
+    }
+
+    @Test
+    void appliesAddressPunishmentsOnlyToSessionsUsingTheNormalizedAddress() {
+        UUID matching = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        PlayerAddress address = PlayerAddress.fromBytes(new byte[]{10, 0, 0, 1});
+        var cache = new SessionPunishmentCache();
+        cache.put(new LoginAssessment(matching, address, NOW, SessionPunishments.empty()));
+        cache.put(new LoginAssessment(other, PlayerAddress.fromBytes(new byte[]{10, 0, 0, 2}), NOW,
+                SessionPunishments.empty()));
+        Punishment warning = new Punishment(UUID.randomUUID(), PunishmentType.WARNING,
+                new AddressPunishmentTarget(address), "Test warning", Actor.console(), NOW,
+                Optional.empty(), Optional.empty());
+
+        cache.apply(warning);
+
+        assertThat(cache.find(matching, address).orElseThrow().undeliveredWarnings()).containsExactly(warning);
+        assertThat(cache.find(other, PlayerAddress.fromBytes(new byte[]{10, 0, 0, 2})).orElseThrow()
+                .undeliveredWarnings()).isEmpty();
+        assertThat(cache.playersAt(address)).containsExactly(matching);
     }
 }

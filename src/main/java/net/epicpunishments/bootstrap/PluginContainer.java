@@ -24,6 +24,8 @@ import net.epicpunishments.interaction.listener.PaperPlayerNotifications;
 import net.epicpunishments.interaction.listener.PaperPunishmentEnforcer;
 import net.epicpunishments.interaction.listener.PlayerConnectionListener;
 import net.epicpunishments.interaction.listener.PlayerMuteListener;
+import net.epicpunishments.punishment.application.AddressPunishmentService;
+import net.epicpunishments.punishment.application.AddressTargetParser;
 import net.epicpunishments.punishment.application.PlayerPunishmentService;
 import net.epicpunishments.punishment.application.PlayerTargetParser;
 import net.epicpunishments.punishment.application.PlayerTargetResolver;
@@ -61,6 +63,7 @@ public final class PluginContainer implements AutoCloseable {
     private volatile LoginAssessmentService loginAssessmentService;
     private volatile SuccessfulJoinService successfulJoinService;
     private volatile PlayerPunishmentService playerPunishmentService;
+    private volatile AddressPunishmentService addressPunishmentService;
     private volatile PunishmentCommandRuntime punishmentCommandRuntime;
 
     private PluginContainer(
@@ -167,6 +170,10 @@ public final class PluginContainer implements AutoCloseable {
         if (playerPunishments != null) {
             playerPunishments.stop();
         }
+        AddressPunishmentService addressPunishments = addressPunishmentService;
+        if (addressPunishments != null) {
+            addressPunishments.stop();
+        }
         punishmentCommandRuntime = null;
         configurations.stop();
         mainThreadExecutor.close();
@@ -237,13 +244,22 @@ public final class PluginContainer implements AutoCloseable {
                 mainThreadExecutor,
                 configurations,
                 joinService,
+                sessions,
                 clock,
                 plugin.getLogger()
         );
         loginAssessmentService = loginService;
         successfulJoinService = joinService;
         playerPunishmentService = playerPunishments;
-        punishmentCommandRuntime = new PunishmentCommandRuntime(playerPunishments, punishmentEnforcer);
+        var addressPunishments = new AddressPunishmentService(new AddressTargetParser(), provider.punishments(),
+                provider.moderationMutations(), sessions, () -> configurations.current()
+                .map(ConfigurationSnapshot::punishments).orElse(snapshot.punishments()), clock);
+        addressPunishmentService = addressPunishments;
+        punishmentCommandRuntime = new PunishmentCommandRuntime(
+                playerPunishments,
+                addressPunishments,
+                punishmentEnforcer
+        );
         pendingLogins = pending;
         sessionPunishments = sessions;
         plugin.getServer().getPluginManager().registerEvents(new PlayerConnectionListener(

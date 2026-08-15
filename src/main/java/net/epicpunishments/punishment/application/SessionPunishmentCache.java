@@ -2,9 +2,10 @@ package net.epicpunishments.punishment.application;
 
 import net.epicpunishments.identity.domain.LoginAssessment;
 import net.epicpunishments.identity.domain.PlayerAddress;
-import net.epicpunishments.punishment.domain.SessionPunishments;
+import net.epicpunishments.punishment.domain.AddressPunishmentTarget;
 import net.epicpunishments.punishment.domain.PlayerPunishmentTarget;
 import net.epicpunishments.punishment.domain.Punishment;
+import net.epicpunishments.punishment.domain.SessionPunishments;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -46,10 +47,14 @@ public final class SessionPunishmentCache {
 
     public void apply(Punishment punishment) {
         Objects.requireNonNull(punishment, "punishment");
-        if (!(punishment.target() instanceof PlayerPunishmentTarget target)) {
-            throw new IllegalArgumentException("Only player punishments can be applied by this milestone");
-        }
-        sessions.computeIfPresent(target.playerId(), (ignored, assessment) -> {
+        sessions.replaceAll((playerId, assessment) -> {
+            boolean matches = punishment.target() instanceof PlayerPunishmentTarget playerTarget
+                    ? playerTarget.playerId().equals(playerId)
+                    : punishment.target() instanceof AddressPunishmentTarget addressTarget
+                    && addressTarget.address().equals(assessment.address());
+            if (!matches) {
+                return assessment;
+            }
             SessionPunishments current = assessment.punishments();
             var bans = new ArrayList<>(current.bans());
             var mutes = new ArrayList<>(current.mutes());
@@ -61,6 +66,12 @@ public final class SessionPunishmentCache {
             }
             return withPunishments(assessment, new SessionPunishments(bans, mutes, warnings));
         });
+    }
+
+    public java.util.Set<UUID> playersAt(PlayerAddress address) {
+        Objects.requireNonNull(address, "address");
+        return sessions.entrySet().stream().filter(entry -> entry.getValue().address().equals(address))
+                .map(java.util.Map.Entry::getKey).collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     public void revoke(UUID punishmentId) {

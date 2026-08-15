@@ -21,11 +21,17 @@ permissions:
   epicpunishments.punishment.ban:
     description: Allows creating player bans.
     default: op
+  epicpunishments.punishment.ban.ip:
+    description: Allows creating IP address bans.
+    default: op
   epicpunishments.punishment.unban:
     description: Allows revoking player bans.
     default: op
   epicpunishments.punishment.mute:
     description: Allows creating player mutes.
+    default: op
+  epicpunishments.punishment.mute.ip:
+    description: Allows creating IP address mutes.
     default: op
   epicpunishments.punishment.unmute:
     description: Allows revoking player mutes.
@@ -33,11 +39,17 @@ permissions:
   epicpunishments.punishment.warn:
     description: Allows creating player warnings.
     default: op
+  epicpunishments.punishment.warn.ip:
+    description: Allows creating IP address warnings.
+    default: op
   epicpunishments.punishment.warnings:
     description: Allows viewing player warnings.
     default: op
   epicpunishments.punishment.history:
     description: Allows viewing player punishment history.
+    default: op
+  epicpunishments.punishment.history.ip:
+    description: Allows viewing complete IP addresses and IP punishment history.
     default: op
   epicpunishments.punishment.override-exempt:
     description: Allows punishing otherwise exempt players.

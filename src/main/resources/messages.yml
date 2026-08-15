@@ -17,7 +17,11 @@ warning:
 punishment:
   usage: '<gold>Use <yellow>/epicpunishments punish <ban|unban|mute|unmute|warn|warnings|history></yellow>.</gold>'
   invalid-input: '<red>Invalid punishment input: {error}</red>'
-  invalid-target: '<red>Use an explicit player target such as player:Name or player:UUID.</red>'
+  invalid-target: '<red>Use an explicit target such as player:Name, player:UUID, or ip:192.0.2.1.</red>'
+  ip-permission-required: '<red>You do not have permission to moderate or view IP address targets.</red>'
+  ip-applied: '<green>Applied {type} to {address}.</green>'
+  ip-revoked: '<green>Revoked {count} active {type} punishment(s) for {address}.</green>'
+  ip-history-header: '<gold>Punishment history for {address} (page {page}/{pages}):</gold>'
   target-not-found: '<red>No stored player matches that target.</red>'
   target-ambiguous: '<red>That historical name matches multiple players; use player:UUID.</red>'
   target-exempt: '<red>That player is exempt from punishments.</red>'
